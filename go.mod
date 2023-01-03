@@ -6,6 +6,7 @@ require (
 	github.com/btwiuse/h3 v0.0.0-20220919172148-51b6e2f27e33
 	github.com/lucas-clemente/quic-go v0.31.1
 	github.com/marten-seemann/webtransport-go v0.4.3
+	github.com/webteleport/utils v0.0.2
 	github.com/webteleport/webteleport v0.2.2
 	golang.org/x/net v0.4.0
 	k0s.io/pkg/middleware v0.1.6
@@ -21,7 +22,7 @@ require (
 	github.com/marten-seemann/qpack v0.3.0 // indirect
 	github.com/marten-seemann/qtls-go1-18 v0.1.3 // indirect
 	github.com/marten-seemann/qtls-go1-19 v0.1.1 // indirect
-	github.com/mattn/go-isatty v0.0.12 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/onsi/ginkgo/v2 v2.2.0 // indirect
 	github.com/rs/cors v1.8.2 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect

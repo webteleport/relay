@@ -1,35 +1,43 @@
 package server
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"net/http"
 
-	"github.com/btwiuse/h3/utils"
 	"k0s.io/pkg/middleware"
 )
 
-var HOST = utils.EnvHost("localhost")
-var CERT = utils.EnvCert("localhost.pem")
-var KEY = utils.EnvKey("localhost-key.pem")
-var PORT = utils.EnvPort(":3000")
-var ALT_SVC = utils.EnvAltSvc(fmt.Sprintf(`webteleport="%s"`, PORT))
-
-func Run([]string) error {
+func listenTCP(handler http.Handler, errc chan error) {
 	log.Println("listening on TCP http://" + HOST + PORT)
 	ln, err := net.Listen("tcp4", PORT)
 	if err != nil {
-		return err
+		errc <- err
+		return
 	}
+	errc <- http.Serve(ln, handler)
+}
 
-	handler := middleware.LoggingMiddleware(middleware.AllowAllCorsMiddleware(DefaultSessionManager))
+func listenUDP(handler http.Handler, errc chan error) {
+	log.Println("listening on UDP https://" + HOST + PORT)
+	wts := WebtransportServer(handler)
+	errc <- wts.ListenAndServeTLS(CERT, KEY)
+}
 
-	go func() {
-		wts := WebtransportServer(handler)
-		log.Println("listening on UDP https://" + HOST + PORT)
-		log.Fatalln(wts.ListenAndServeTLS(CERT, KEY))
-	}()
+func listenAll(handler http.Handler) error {
+	var errc chan error = make(chan error, 2)
 
-	return http.Serve(ln, handler)
+	go listenTCP(handler, errc)
+	go listenUDP(handler, errc)
+
+	return <-errc
+}
+
+func Run([]string) error {
+	var dsm http.Handler = DefaultSessionManager
+
+	dsm = middleware.AllowAllCorsMiddleware(dsm)
+	dsm = middleware.LoggingMiddleware(dsm)
+
+	return listenAll(dsm)
 }
