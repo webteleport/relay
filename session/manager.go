@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btwiuse/pretty"
 	"github.com/webteleport/server/envs"
 	"golang.org/x/net/idna"
 )
@@ -19,12 +20,14 @@ import (
 var DefaultSessionManager = &SessionManager{
 	counter:  0,
 	sessions: map[string]*Session{},
+	ssnstamp: map[string]time.Time{},
 	slock:    &sync.RWMutex{},
 }
 
 type SessionManager struct {
 	counter  int
 	sessions map[string]*Session
+	ssnstamp map[string]time.Time
 	slock    *sync.RWMutex
 }
 
@@ -35,6 +38,7 @@ func (sm *SessionManager) Del(k string) error {
 	}
 	sm.slock.Lock()
 	delete(sm.sessions, k)
+	delete(sm.ssnstamp, k)
 	sm.slock.Unlock()
 	return nil
 }
@@ -44,6 +48,7 @@ func (sm *SessionManager) DelSession(ssn *Session) {
 	for k, v := range sm.sessions {
 		if v == ssn {
 			delete(sm.sessions, k)
+			delete(sm.ssnstamp, k)
 			emsg := fmt.Sprintf("Recycled %s", k)
 			log.Println(emsg)
 		}
@@ -68,6 +73,7 @@ func (sm *SessionManager) Add(k string, ssn *Session) error {
 	sm.slock.Lock()
 	sm.counter += 1
 	sm.sessions[k] = ssn
+	sm.ssnstamp[k] = time.Now()
 	sm.slock.Unlock()
 	return nil
 }
@@ -98,13 +104,10 @@ func (sm *SessionManager) Lease(ssn *Session, candidates []string) error {
 	if err != nil {
 		return err
 	}
-	log.Println("leasing", lease)
 	err = sm.Add(lease, ssn)
 	if err != nil {
 		return err
 	}
-	log.Println("leasing", "x"+lease)
-	sm.Add("x"+lease, ssn)
 	return nil
 }
 
@@ -124,11 +127,34 @@ func (sm *SessionManager) NotFoundHandler(w http.ResponseWriter, r *http.Request
 	NotFoundHandler().ServeHTTP(w, r)
 }
 
+type Record struct {
+	Host      string    `json:"host"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	all := []Record{}
+	for k, _ := range sm.sessions {
+		host := k
+		since := sm.ssnstamp[host]
+		all = append(all, Record{Host: host, CreatedAt: since})
+	}
+	resp := pretty.JSONString(all)
+	io.WriteString(w, resp)
+}
+
 func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Alt-Svc", envs.ALT_SVC)
 	// for HTTP_PROXY r.Method = GET && r.Host = google.com
 	// for HTTPs_PROXY r.Method = GET && r.Host = google.com:443
 	// they are currently not supported and will be handled by the 404 handler
+	origin, _, _ := strings.Cut(r.Host, ":")
+	if origin == envs.HOST {
+		sm.IndexHandler(w, r)
+		return
+	}
+
 	ssn, ok := sm.Get(r.Host)
 	if !ok {
 		sm.NotFoundHandler(w, r)
