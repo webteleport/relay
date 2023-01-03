@@ -1,4 +1,4 @@
-package server
+package session
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/webteleport/server/envs"
 	"golang.org/x/net/idna"
 )
 
@@ -76,7 +77,7 @@ func (sm *SessionManager) Lease(ssn *Session, candidates []string) error {
 	allowRandom := len(candidates) == 0
 	var lease string
 	for _, pfx := range candidates {
-		k := fmt.Sprintf("%s.%s", pfx, HOST)
+		k := fmt.Sprintf("%s.%s", pfx, envs.HOST)
 		if _, exist := sm.Get(k); !exist {
 			lease = k
 			break
@@ -91,7 +92,7 @@ func (sm *SessionManager) Lease(ssn *Session, candidates []string) error {
 		return nil
 	}
 	if lease == "" {
-		lease = fmt.Sprintf("%d.%s", sm.counter, HOST)
+		lease = fmt.Sprintf("%d.%s", sm.counter, envs.HOST)
 	}
 	_, err = io.WriteString(ssn.Controller, fmt.Sprintf("HOST %s\n", lease))
 	if err != nil {
@@ -124,7 +125,7 @@ func (sm *SessionManager) NotFoundHandler(w http.ResponseWriter, r *http.Request
 }
 
 func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Alt-Svc", ALT_SVC)
+	w.Header().Set("Alt-Svc", envs.ALT_SVC)
 	// for HTTP_PROXY r.Method = GET && r.Host = google.com
 	// for HTTPs_PROXY r.Method = GET && r.Host = google.com:443
 	// they are currently not supported and will be handled by the 404 handler
