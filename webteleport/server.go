@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/lucas-clemente/quic-go/http3"
-	"github.com/marten-seemann/webtransport-go"
+	"github.com/webtransport/quic-go/http3"
+	"github.com/webtransport/webtransport-go"
 	"github.com/webteleport/server/envs"
 	"github.com/webteleport/server/session"
 )

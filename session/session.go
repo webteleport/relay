@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/marten-seemann/webtransport-go"
+	"github.com/webtransport/webtransport-go"
 	"github.com/webteleport/webteleport"
 )
 
