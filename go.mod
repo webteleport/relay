@@ -1,12 +1,12 @@
 module github.com/webteleport/server
 
-go 1.19
+go 1.20
 
 require (
 	github.com/btwiuse/h3 v0.0.0-20220919172148-51b6e2f27e33
 	github.com/btwiuse/pretty v0.2.1
 	github.com/webteleport/utils v0.0.3
-	github.com/webteleport/webteleport v0.2.4
+	github.com/webteleport/webteleport v0.2.7
 	github.com/webtransport/quic-go v0.0.0-webtransport
 	github.com/webtransport/webtransport-go v0.0.0-webtransport
 	golang.org/x/net v0.4.0
