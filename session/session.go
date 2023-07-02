@@ -4,14 +4,16 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/url"
 
-	"github.com/webtransport/webtransport-go"
 	"github.com/webteleport/webteleport"
+	"github.com/webtransport/webtransport-go"
 )
 
 type Session struct {
 	*webtransport.Session
 	Controller net.Conn
+	Values     url.Values
 }
 
 func (ssn *Session) InitController(ctx context.Context) error {

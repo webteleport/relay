@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -128,8 +129,9 @@ func (sm *SessionManager) NotFoundHandler(w http.ResponseWriter, r *http.Request
 }
 
 type Record struct {
-	Host      string    `json:"host"`
-	CreatedAt time.Time `json:"created_at"`
+	Host      string     `json:"host"`
+	CreatedAt time.Time  `json:"created_at"`
+	Tags      url.Values `json:"tags"`
 }
 
 func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +140,8 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	for k, _ := range sm.sessions {
 		host := k
 		since := sm.ssnstamp[host]
-		all = append(all, Record{Host: host, CreatedAt: since})
+		tags := sm.sessions[host].Values
+		all = append(all, Record{Host: host, CreatedAt: since, Tags: tags})
 	}
 	resp := pretty.JSONString(all)
 	io.WriteString(w, resp)

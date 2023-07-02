@@ -5,10 +5,10 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/webtransport/quic-go/http3"
-	"github.com/webtransport/webtransport-go"
 	"github.com/webteleport/server/envs"
 	"github.com/webteleport/server/session"
+	"github.com/webtransport/quic-go/http3"
+	"github.com/webtransport/webtransport-go"
 )
 
 func NewServer(next http.Handler) *webtransport.Server {
@@ -39,7 +39,7 @@ func (s *WebTeleportServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.Next.ServeHTTP(w, r)
 		return
 	}
-	log.Println("🛸", r.RemoteAddr, r.Proto, r.Method, r.Host, r.URL.Path)
+	log.Println("🛸", r.RemoteAddr, r.Proto, r.Method, r.Host, r.URL.Path, r.URL.RawQuery)
 	// handle ufo client registration
 	// Host: ufo.k0s.io:300
 	ssn, err := s.Upgrade(w, r)
@@ -50,6 +50,7 @@ func (s *WebTeleportServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	currentSession := &session.Session{
 		Session: ssn,
+		Values:  r.URL.Query(),
 	}
 	err = currentSession.InitController(context.Background())
 	if err != nil {
