@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -141,8 +142,16 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		host := k
 		since := sm.ssnstamp[host]
 		tags := sm.sessions[host].Values
-		all = append(all, Record{Host: host, CreatedAt: since, Tags: tags})
+		record := Record{
+			Host:      host,
+			CreatedAt: since,
+			Tags:      tags,
+		}
+		all = append(all, record)
 	}
+	sort.Slice(all, func(i, j int) bool {
+		return all[i].CreatedAt.After(all[j].CreatedAt)
+	})
 	resp := pretty.JSONString(all)
 	io.WriteString(w, resp)
 }
