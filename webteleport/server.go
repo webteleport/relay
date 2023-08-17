@@ -7,8 +7,8 @@ import (
 
 	"github.com/webteleport/server/envs"
 	"github.com/webteleport/server/session"
-	"github.com/webtransport/quic-go/http3"
-	"github.com/webtransport/webtransport-go"
+	"github.com/quic-go/quic-go/http3"
+	"github.com/quic-go/webtransport-go"
 )
 
 func NewServer(next http.Handler) *webtransport.Server {

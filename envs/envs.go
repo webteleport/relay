@@ -3,7 +3,7 @@ package envs
 import (
 	"fmt"
 
-	"github.com/btwiuse/h3/utils"
+	"github.com/webteleport/utils"
 )
 
 var (
