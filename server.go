@@ -8,7 +8,6 @@ import (
 	"github.com/webteleport/server/envs"
 	"github.com/webteleport/server/session"
 	"github.com/webteleport/server/webteleport"
-	"github.com/webteleport/utils"
 	"k0s.io/pkg/middleware"
 )
 
@@ -40,13 +39,7 @@ func listenAll(handler http.Handler) error {
 func Run([]string) error {
 	var dsm http.Handler = session.DefaultSessionManager
 
-	dsm = middleware.AllowAllCorsMiddleware(dsm)
 	dsm = middleware.LoggingMiddleware(dsm)
-	dsm = utils.CompactHeadersMiddleware(dsm, []string{
-		"Access-Control-Allow-Origin",
-		"Alt-Svc",
-		"Vary",
-	})
 
 	return listenAll(dsm)
 }
