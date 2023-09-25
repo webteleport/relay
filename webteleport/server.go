@@ -5,10 +5,10 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/webteleport/server/envs"
-	"github.com/webteleport/server/session"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
+	"github.com/webteleport/server/envs"
+	"github.com/webteleport/server/session"
 )
 
 func NewServer(next http.Handler) *webtransport.Server {

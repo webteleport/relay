@@ -6,8 +6,8 @@ import (
 	"net"
 	"net/url"
 
-	"github.com/webteleport/webteleport"
 	"github.com/quic-go/webtransport-go"
+	"github.com/webteleport/webteleport"
 )
 
 type Session struct {

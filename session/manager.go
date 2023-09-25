@@ -135,7 +135,7 @@ type Record struct {
 	Tags      url.Values `json:"tags"`
 }
 
-func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
+func (sm *SessionManager) ApiSessionsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	all := []Record{}
 	for k, _ := range sm.sessions {
@@ -154,6 +154,15 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	})
 	resp := pretty.JSONString(all)
 	io.WriteString(w, resp)
+}
+
+func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case "/api/sessions":
+		sm.ApiSessionsHandler(w, r)
+	default:
+		sm.NotFoundHandler(w, r)
+	}
 }
 
 func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
