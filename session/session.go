@@ -45,6 +45,9 @@ func (ssn *Session) OpenConn(ctx context.Context) (net.Conn, error) {
 	}
 	// log.Println(`MARK`, stream)
 	// MARK
-	conn := &webteleport.StreamConn{stream, ssn.Session}
+	conn := &webteleport.StreamConn{
+		Stream:  stream,
+		Session: ssn.Session,
+	}
 	return conn, nil
 }

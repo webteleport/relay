@@ -80,36 +80,46 @@ func (sm *SessionManager) Add(k string, ssn *Session) error {
 	return nil
 }
 
-func (sm *SessionManager) Lease(ssn *Session, candidates []string) error {
-	var err error
+// canClobber checks if the clobber string matches the session's clobber value
+func canClobber(ssn *Session, clobber string) bool {
+	return clobber != "" && ssn.Values.Get("clobber") == clobber
+}
+
+func (sm *SessionManager) Lease(ssn *Session, candidates []string, clobber string) error {
 	allowRandom := len(candidates) == 0
-	var lease string
+	leaseCandidate := ""
+
+	// Try to lease the first available subdomain if candidates are provided
 	for _, pfx := range candidates {
 		k := fmt.Sprintf("%s.%s", pfx, envs.HOST)
-		if _, exist := sm.Get(k); !exist {
-			lease = k
+		if ssn, exist := sm.Get(k); !exist || canClobber(ssn, clobber) {
+			leaseCandidate = k
 			break
 		}
 	}
-	if (lease == "") && !allowRandom {
+
+	// If no specified candidates are available and random is not allowed, return with an error
+	if leaseCandidate == "" && !allowRandom {
 		emsg := fmt.Sprintf("ERR %s: %v\n", "none of your requested subdomains are currently available", candidates)
-		_, err = io.WriteString(ssn.Controller, emsg)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	if lease == "" {
-		lease = fmt.Sprintf("%d.%s", sm.counter, envs.HOST)
-	}
-	_, err = io.WriteString(ssn.Controller, fmt.Sprintf("HOST %s\n", lease))
-	if err != nil {
+		_, err := io.WriteString(ssn.Controller, emsg)
 		return err
 	}
-	err = sm.Add(lease, ssn)
-	if err != nil {
+
+	// If no candidates were specified, generate a random subdomain
+	if leaseCandidate == "" {
+		leaseCandidate = fmt.Sprintf("%d.%s", sm.counter, envs.HOST)
+	}
+
+	// Notify the client of the leaseCandidate
+	if _, err := io.WriteString(ssn.Controller, fmt.Sprintf("HOST %s\n", leaseCandidate)); err != nil {
 		return err
 	}
+
+	// Add the leaseCandidate to the session manager
+	if err := sm.Add(leaseCandidate, ssn); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -138,8 +148,7 @@ type Record struct {
 func (sm *SessionManager) ApiSessionsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	all := []Record{}
-	for k, _ := range sm.sessions {
-		host := k
+	for host := range sm.sessions {
 		since := sm.ssnstamp[host]
 		tags := sm.sessions[host].Values
 		record := Record{

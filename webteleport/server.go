@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
@@ -58,7 +60,8 @@ func (s *WebTeleportServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	candidates := ParseDomainCandidates(r.URL.Path)
-	err = session.DefaultSessionManager.Lease(currentSession, candidates)
+	clobber := r.URL.Query().Get("clobber")
+	err = session.DefaultSessionManager.Lease(currentSession, candidates, clobber)
 	if err != nil {
 		log.Printf("leasing failed: %s", err)
 		return
