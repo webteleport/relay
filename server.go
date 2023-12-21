@@ -3,7 +3,7 @@
 package server
 
 import (
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 
@@ -14,7 +14,7 @@ import (
 )
 
 func listenTCP(handler http.Handler, errc chan error) {
-	log.Println("listening on TCP http://" + envs.HOST + envs.PORT)
+	slog.Info("listening on TCP http://" + envs.HOST + envs.PORT)
 	ln, err := net.Listen("tcp4", envs.PORT)
 	if err != nil {
 		errc <- err
@@ -24,7 +24,7 @@ func listenTCP(handler http.Handler, errc chan error) {
 }
 
 func listenUDP(handler http.Handler, errc chan error) {
-	log.Println("listening on UDP https://" + envs.HOST + envs.PORT)
+	slog.Info("listening on UDP https://" + envs.HOST + envs.PORT)
 	wts := webteleport.NewServer(handler)
 	errc <- wts.ListenAndServeTLS(envs.CERT, envs.KEY)
 }

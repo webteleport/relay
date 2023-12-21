@@ -2,7 +2,8 @@ package webteleport
 
 import (
 	"context"
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/quic-go/quic-go/http3"
@@ -39,12 +40,12 @@ func (s *WebTeleportServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.Next.ServeHTTP(w, r)
 		return
 	}
-	log.Println("🛸", r.RemoteAddr, r.Proto, r.Method, r.Host, r.URL.Path, r.URL.RawQuery)
+	slog.Info(fmt.Sprintf("🛸", r.RemoteAddr, r.Proto, r.Method, r.Host, r.URL.Path, r.URL.RawQuery))
 	// handle ufo client registration
 	// Host: ufo.k0s.io:300
 	ssn, err := s.Upgrade(w, r)
 	if err != nil {
-		log.Printf("upgrading failed: %s", err)
+		slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
 		w.WriteHeader(500)
 		return
 	}
@@ -54,14 +55,14 @@ func (s *WebTeleportServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	err = currentSession.InitController(context.Background())
 	if err != nil {
-		log.Printf("session init failed: %s", err)
+		slog.Warn(fmt.Sprintf("session init failed: %s", err))
 		return
 	}
 	candidates := ParseDomainCandidates(r.URL.Path)
 	clobber := r.URL.Query().Get("clobber")
 	err = session.DefaultSessionManager.Lease(currentSession, candidates, clobber)
 	if err != nil {
-		log.Printf("leasing failed: %s", err)
+		slog.Warn(fmt.Sprintf("leasing failed: %s", err))
 		return
 	}
 	go session.DefaultSessionManager.Ping(currentSession)

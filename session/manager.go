@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -52,7 +52,7 @@ func (sm *SessionManager) DelSession(ssn *Session) {
 			delete(sm.sessions, k)
 			delete(sm.ssnstamp, k)
 			emsg := fmt.Sprintf("Recycled %s", k)
-			log.Println(emsg)
+			slog.Info(emsg)
 		}
 	}
 	sm.slock.Unlock()
