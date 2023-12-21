@@ -1,3 +1,5 @@
+// root package development moved to github.com/webteleport/ufo/apps/server
+
 package server
 
 import (
