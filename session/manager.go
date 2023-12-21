@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -140,9 +139,9 @@ func (sm *SessionManager) NotFoundHandler(w http.ResponseWriter, r *http.Request
 }
 
 type Record struct {
-	Host      string     `json:"host"`
-	CreatedAt time.Time  `json:"created_at"`
-	Tags      url.Values `json:"tags"`
+	Host      string    `json:"host"`
+	CreatedAt time.Time `json:"created_at"`
+	Tags      Tags      `json:"tags"`
 }
 
 func (sm *SessionManager) ApiSessionsHandler(w http.ResponseWriter, r *http.Request) {
@@ -150,7 +149,7 @@ func (sm *SessionManager) ApiSessionsHandler(w http.ResponseWriter, r *http.Requ
 	all := []Record{}
 	for host := range sm.sessions {
 		since := sm.ssnstamp[host]
-		tags := sm.sessions[host].Values
+		tags := Tags{Values: sm.sessions[host].Values}
 		record := Record{
 			Host:      host,
 			CreatedAt: since,
