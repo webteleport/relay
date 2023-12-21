@@ -6,7 +6,7 @@ require (
 	github.com/quic-go/quic-go v0.37.5
 	github.com/quic-go/webtransport-go v0.5.3
 	github.com/webteleport/utils v0.0.5
-	github.com/webteleport/webteleport v0.2.15
+	github.com/webteleport/webteleport v0.2.16
 	golang.org/x/net v0.14.0
 	k0s.io/pkg/middleware v0.1.6
 )
