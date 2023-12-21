@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -14,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btwiuse/pretty"
 	"github.com/webteleport/server/envs"
 	"golang.org/x/net/idna"
 )
@@ -161,8 +161,10 @@ func (sm *SessionManager) ApiSessionsHandler(w http.ResponseWriter, r *http.Requ
 	sort.Slice(all, func(i, j int) bool {
 		return all[i].CreatedAt.After(all[j].CreatedAt)
 	})
-	resp := pretty.JSONString(all)
-	io.WriteString(w, resp)
+	encoder := json.NewEncoder(w)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "  ")
+	encoder.Encode(all)
 }
 
 func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
