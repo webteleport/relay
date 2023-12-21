@@ -40,7 +40,7 @@ func (s *WebTeleportServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.Next.ServeHTTP(w, r)
 		return
 	}
-	slog.Info(fmt.Sprintf("🛸", r.RemoteAddr, r.Proto, r.Method, r.Host, r.URL.Path, r.URL.RawQuery))
+	slog.Info(fmt.Sprint("🛸", r.RemoteAddr, r.Proto, r.Method, r.Host, r.URL.Path, r.URL.RawQuery))
 	// handle ufo client registration
 	// Host: ufo.k0s.io:300
 	ssn, err := s.Upgrade(w, r)
