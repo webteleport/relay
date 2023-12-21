@@ -2,7 +2,6 @@ package session
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -22,6 +21,7 @@ var DefaultSessionManager = &SessionManager{
 	counter:  0,
 	sessions: map[string]*Session{},
 	ssnstamp: map[string]time.Time{},
+	ssn_cntr: map[string]int{},
 	slock:    &sync.RWMutex{},
 }
 
@@ -29,6 +29,7 @@ type SessionManager struct {
 	counter  int
 	sessions map[string]*Session
 	ssnstamp map[string]time.Time
+	ssn_cntr map[string]int
 	slock    *sync.RWMutex
 }
 
@@ -40,6 +41,7 @@ func (sm *SessionManager) Del(k string) error {
 	sm.slock.Lock()
 	delete(sm.sessions, k)
 	delete(sm.ssnstamp, k)
+	delete(sm.ssn_cntr, k)
 	sm.slock.Unlock()
 	return nil
 }
@@ -50,6 +52,7 @@ func (sm *SessionManager) DelSession(ssn *Session) {
 		if v == ssn {
 			delete(sm.sessions, k)
 			delete(sm.ssnstamp, k)
+			delete(sm.ssn_cntr, k)
 			emsg := fmt.Sprintf("Recycled %s", k)
 			slog.Info(emsg)
 		}
@@ -75,6 +78,7 @@ func (sm *SessionManager) Add(k string, ssn *Session) error {
 	sm.counter += 1
 	sm.sessions[k] = ssn
 	sm.ssnstamp[k] = time.Now()
+	sm.ssn_cntr[k] = 0
 	sm.slock.Unlock()
 	return nil
 }
@@ -122,13 +126,15 @@ func (sm *SessionManager) Lease(ssn *Session, candidates []string, clobber strin
 	return nil
 }
 
+var PingInterval = 5 * time.Second
+
 func (sm *SessionManager) Ping(ssn *Session) {
 	for {
+		time.Sleep(PingInterval)
 		_, err := io.WriteString(ssn.Controller, fmt.Sprintf("%s\n", "PING"))
 		if err != nil {
 			break
 		}
-		time.Sleep(5 * time.Second)
 	}
 	sm.DelSession(ssn)
 }
@@ -142,6 +148,7 @@ type Record struct {
 	Host      string    `json:"host"`
 	CreatedAt time.Time `json:"created_at"`
 	Tags      Tags      `json:"tags"`
+	Visited   int       `json:"visited"`
 }
 
 func (sm *SessionManager) ApiSessionsHandler(w http.ResponseWriter, r *http.Request) {
@@ -150,20 +157,24 @@ func (sm *SessionManager) ApiSessionsHandler(w http.ResponseWriter, r *http.Requ
 	for host := range sm.sessions {
 		since := sm.ssnstamp[host]
 		tags := Tags{Values: sm.sessions[host].Values}
+		visited := sm.ssn_cntr[host]
 		record := Record{
 			Host:      host,
 			CreatedAt: since,
 			Tags:      tags,
+			Visited:   visited,
 		}
 		all = append(all, record)
 	}
 	sort.Slice(all, func(i, j int) bool {
 		return all[i].CreatedAt.After(all[j].CreatedAt)
 	})
-	encoder := json.NewEncoder(w)
-	encoder.SetEscapeHTML(false)
-	encoder.SetIndent("", "  ")
-	encoder.Encode(all)
+	resp, err := UnescapedJSONMarshalIndent(all, "  ")
+	if err != nil {
+		slog.Warn(fmt.Sprintf("json marshal failed: %s", err))
+		return
+	}
+	w.Write(resp)
 }
 
 func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
@@ -173,6 +184,12 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	default:
 		sm.NotFoundHandler(w, r)
 	}
+}
+
+func (sm *SessionManager) IncrementVisit(k string) {
+	sm.slock.Lock()
+	sm.ssn_cntr[k] += 1
+	sm.slock.Unlock()
 }
 
 func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -191,6 +208,8 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		sm.NotFoundHandler(w, r)
 		return
 	}
+
+	sm.IncrementVisit(r.Host)
 
 	dr := func(req *http.Request) {
 		// log.Println("director: rewriting Host", r.URL, r.Host)

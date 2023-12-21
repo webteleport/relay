@@ -1,6 +1,7 @@
 package session
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/url"
 )
@@ -20,5 +21,14 @@ func (c Tags) MarshalJSON() ([]byte, error) {
 		}
 	}
 
-	return json.Marshal(m)
+	return UnescapedJSONMarshalIndent(m, "  ")
+}
+
+func UnescapedJSONMarshalIndent(v interface{}, indent string) ([]byte, error) {
+	var resultBytes bytes.Buffer
+	enc := json.NewEncoder(&resultBytes)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", indent)
+	err := enc.Encode(v)
+	return bytes.TrimSpace(resultBytes.Bytes()), err
 }
