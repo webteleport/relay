@@ -6,12 +6,62 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 
+	"github.com/caddyserver/certmagic"
+	"github.com/libdns/digitalocean"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
 	"github.com/webteleport/server/envs"
 	"github.com/webteleport/server/session"
 )
+
+var EmailName = "btwiuse"
+var EmailContext = "webteleport"
+var EmailSuffix = "gmail.com"
+
+func getCertificatesOnDemand() {
+	// if the decision function returns an error, a certificate
+	// may not be obtained for that name at that time
+	certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
+		DecisionFunc: func(_ctx context.Context, name string) error {
+			return nil
+		},
+	}
+}
+
+func getWildcardCertificates() {
+	certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
+		DNSProvider: &digitalocean.Provider{
+			APIToken: os.Getenv("DIGITALOCEAN_ACCESS_TOKEN"),
+		},
+	}
+}
+
+func init() {
+	// read and agree to your CA's legal documents
+	certmagic.DefaultACME.Agreed = true
+
+	// provide an email address
+	certmagic.DefaultACME.Email = fmt.Sprintf("%s+%s@%s", EmailName, EmailContext, EmailSuffix)
+
+	getCertificatesOnDemand()
+}
+
+func NewServerTLSOnDemand(next http.Handler) *webtransport.Server {
+	s := &webtransport.Server{
+		CheckOrigin: func(*http.Request) bool { return true },
+	}
+	s.H3 = http3.Server{
+		Addr:            envs.PORT,
+		Handler:         &WebTeleportServer{s, next},
+		EnableDatagrams: true,
+		TLSConfig: &tls.Config{
+			GetCertificate: certmagic.Default.GetCertificate,
+		},
+	}
+	return s
+}
 
 func NewServerTLS(next http.Handler, certFile, keyFile string) *webtransport.Server {
 	s := &webtransport.Server{
