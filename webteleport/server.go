@@ -2,6 +2,7 @@ package webteleport
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,29 @@ import (
 	"github.com/webteleport/server/envs"
 	"github.com/webteleport/server/session"
 )
+
+func NewServerTLS(next http.Handler, certFile, keyFile string) *webtransport.Server {
+	s := &webtransport.Server{
+		CheckOrigin: func(*http.Request) bool { return true },
+	}
+	GetCertificate := func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+		// Always get latest localhost.crt and localhost.key
+		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+		if err != nil {
+			return nil, err
+		}
+		return &cert, nil
+	}
+	s.H3 = http3.Server{
+		Addr:            envs.PORT,
+		Handler:         &WebTeleportServer{s, next},
+		EnableDatagrams: true,
+		TLSConfig: &tls.Config{
+			GetCertificate: GetCertificate,
+		},
+	}
+	return s
+}
 
 func NewServer(next http.Handler) *webtransport.Server {
 	s := &webtransport.Server{

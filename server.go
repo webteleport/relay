@@ -25,8 +25,8 @@ func listenTCP(handler http.Handler, errc chan error) {
 
 func listenUDP(handler http.Handler, errc chan error) {
 	slog.Info("listening on UDP https://" + envs.HOST + envs.PORT)
-	wts := webteleport.NewServer(handler)
-	errc <- wts.ListenAndServeTLS(envs.CERT, envs.KEY)
+	wts := webteleport.NewServerTLS(handler, envs.CERT, envs.KEY)
+	errc <- wts.ListenAndServe()
 }
 
 func listenAll(handler http.Handler) error {
