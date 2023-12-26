@@ -3,6 +3,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"log/slog"
 	"net"
 	"net/http"
@@ -30,9 +31,15 @@ func listenTCPOnDemandTLS(handler http.Handler, errc chan error) {
 	// listener and does not presume HTTP is also being served,
 	// the HTTP challenge will be disabled. The package variable
 	// Default is modified so that the HTTP challenge is disabled.
-	certmagic.Default.DisableHTTPChallenge = true
-	ln, err := tls.Listen("tcp4", ":443", certmagic.Default.TLSConfig())
-	ln, err := net.Listen("tcp4", envs.PORT)
+	certmagic.DefaultACME.DisableHTTPChallenge = true
+	// tlsConfig := certmagic.Default.TLSConfig()
+	tlsConfig, err := certmagic.TLS([]string{envs.HOST})
+	if err != nil {
+		errc <- err
+		return
+	}
+	tlsConfig.NextProtos = append([]string{"h2", "http/1.1"}, tlsConfig.NextProtos...)
+	ln, err := tls.Listen("tcp4", envs.PORT, tlsConfig)
 	if err != nil {
 		errc <- err
 		return
@@ -48,7 +55,11 @@ func listenUDP(handler http.Handler, errc chan error) {
 
 func listenUDPOnDemandTLS(handler http.Handler, errc chan error) {
 	slog.Info("listening on UDP https://" + envs.HOST + envs.PORT + " w/ on demand tls")
-	wts := webteleport.NewServerTLSOnDemand(handler)
+	wts, err := webteleport.NewServerTLSOnDemand(handler)
+	if err != nil {
+		errc <- err
+		return
+	}
 	errc <- wts.ListenAndServe()
 }
 
