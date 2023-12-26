@@ -59,7 +59,7 @@ func NewServerTLSOnDemand(next http.Handler) (*webtransport.Server, error) {
 	}
 	tlsConfig.NextProtos = append([]string{"h2", "http/1.1"}, tlsConfig.NextProtos...)
 	s.H3 = http3.Server{
-		Addr:            envs.PORT,
+		Addr:            envs.UDP_PORT,
 		Handler:         &WebTeleportServer{s, next},
 		EnableDatagrams: true,
 		TLSConfig:       tlsConfig,
@@ -80,7 +80,7 @@ func NewServerTLS(next http.Handler, certFile, keyFile string) *webtransport.Ser
 		return &cert, nil
 	}
 	s.H3 = http3.Server{
-		Addr:            envs.PORT,
+		Addr:            envs.UDP_PORT,
 		Handler:         &WebTeleportServer{s, next},
 		EnableDatagrams: true,
 		TLSConfig: &tls.Config{
@@ -95,7 +95,7 @@ func NewServer(next http.Handler) *webtransport.Server {
 		CheckOrigin: func(*http.Request) bool { return true },
 	}
 	s.H3 = http3.Server{
-		Addr:            envs.PORT,
+		Addr:            envs.UDP_PORT,
 		Handler:         &WebTeleportServer{s, next},
 		EnableDatagrams: true,
 	}
