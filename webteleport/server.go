@@ -48,44 +48,15 @@ func init() {
 	getCertificatesOnDemand()
 }
 
-func NewServerTLSOnDemand(next http.Handler) (*webtransport.Server, error) {
+func NewServerTLS(next http.Handler, tlsConfig *tls.Config) *webtransport.Server {
 	s := &webtransport.Server{
 		CheckOrigin: func(*http.Request) bool { return true },
 	}
-	certmagic.DefaultACME.DisableHTTPChallenge = true
-	tlsConfig, err := certmagic.TLS([]string{envs.HOST})
-	if err != nil {
-		return nil, err
-	}
-	tlsConfig.NextProtos = append([]string{"h2", "http/1.1"}, tlsConfig.NextProtos...)
 	s.H3 = http3.Server{
 		Addr:            envs.UDP_PORT,
 		Handler:         &WebTeleportServer{s, next},
 		EnableDatagrams: true,
 		TLSConfig:       tlsConfig,
-	}
-	return s, nil
-}
-
-func NewServerTLS(next http.Handler, certFile, keyFile string) *webtransport.Server {
-	s := &webtransport.Server{
-		CheckOrigin: func(*http.Request) bool { return true },
-	}
-	GetCertificate := func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
-		// Always get latest localhost.crt and localhost.key
-		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
-		if err != nil {
-			return nil, err
-		}
-		return &cert, nil
-	}
-	s.H3 = http3.Server{
-		Addr:            envs.UDP_PORT,
-		Handler:         &WebTeleportServer{s, next},
-		EnableDatagrams: true,
-		TLSConfig: &tls.Config{
-			GetCertificate: GetCertificate,
-		},
 	}
 	return s
 }
