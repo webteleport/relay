@@ -4,6 +4,7 @@ go 1.21
 
 require (
 	github.com/caddyserver/certmagic v0.20.0
+	github.com/elazarl/goproxy v0.0.0-20231117061959-7cc037d33fb5
 	github.com/libdns/digitalocean v0.0.0-20230728223659-4f9064657aea
 	github.com/quic-go/quic-go v0.40.1
 	github.com/quic-go/webtransport-go v0.6.0

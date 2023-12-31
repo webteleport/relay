@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elazarl/goproxy"
 	"github.com/webteleport/server/envs"
 	"golang.org/x/net/idna"
 )
@@ -144,6 +145,12 @@ func (sm *SessionManager) NotFoundHandler(w http.ResponseWriter, r *http.Request
 	NotFoundHandler().ServeHTTP(w, r)
 }
 
+func (sm *SessionManager) ConnectHandler(w http.ResponseWriter, r *http.Request) {
+	proxy := goproxy.NewProxyHttpServer()
+	proxy.Verbose = true
+	proxy.ServeHTTP(w, r)
+}
+
 type Record struct {
 	Host      string    `json:"host"`
 	CreatedAt time.Time `json:"created_at"`
@@ -205,6 +212,10 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ssn, ok := sm.Get(r.Host)
 	if !ok {
+		if r.Method == http.MethodConnect {
+			sm.ConnectHandler(w, r)
+			return
+		}
 		sm.NotFoundHandler(w, r)
 		return
 	}
