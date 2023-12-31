@@ -141,7 +141,6 @@ func (sm *SessionManager) Ping(ssn *Session) {
 }
 
 func (sm *SessionManager) NotFoundHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotFound)
 	NotFoundHandler().ServeHTTP(w, r)
 }
 

@@ -42,6 +42,8 @@ func NotFoundHandler() http.Handler {
 		Link:    "https://github.com/webteleport/ufo",
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
 		tmpl.Execute(w, data)
 	})
 }
