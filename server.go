@@ -1,4 +1,4 @@
-package webteleport
+package relay
 
 import (
 	"context"
@@ -14,11 +14,8 @@ import (
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
 	"github.com/webteleport/relay/session"
+	"github.com/webteleport/utils"
 )
-
-var EmailName = "btwiuse"
-var EmailContext = "webteleport"
-var EmailSuffix = "gmail.com"
 
 func getCertificatesOnDemand() {
 	// if the decision function returns an error, a certificate
@@ -39,38 +36,42 @@ func getWildcardCertificates() {
 }
 
 func init() {
-	// read and agree to your CA's legal documents
-	certmagic.DefaultACME.Agreed = true
+	var EmailName = "btwiuse"
+	var EmailContext = "webteleport"
+	var EmailSuffix = "gmail.com"
 
 	// provide an email address
 	certmagic.DefaultACME.Email = fmt.Sprintf("%s+%s@%s", EmailName, EmailContext, EmailSuffix)
 
+	// read and agree to your CA's legal documents
+	certmagic.DefaultACME.Agreed = true
+
 	getCertificatesOnDemand()
 }
 
-func NewServerTLS(host, port string, next http.Handler, tlsConfig *tls.Config) *webtransport.Server {
+func New(host, port string, next http.Handler, tlsConfig *tls.Config) *Relay {
 	session.DefaultSessionManager.HOST = host
 	s := &webtransport.Server{
 		CheckOrigin: func(*http.Request) bool { return true },
 	}
-	wts := &WebTeleportServer{
+	r := &Relay{
 		Server: s,
 		Next:   next,
 		HOST:   host,
 	}
 	s.H3 = http3.Server{
 		Addr:            port,
-		Handler:         wts,
+		Handler:         r,
 		EnableDatagrams: true,
 		TLSConfig:       tlsConfig,
 	}
-	return s
+	return r
 }
 
 // WebTeleport is a HTTP/3 server that handles:
 // - UFO client registration (CONNECT HOST)
 // - requests over HTTP/3 (others)
-type WebTeleportServer struct {
+type Relay struct {
 	*webtransport.Server
 	Next http.Handler
 	HOST string
@@ -86,7 +87,7 @@ type WebTeleportServer struct {
 //
 // if all true, it will be upgraded into a webtransport session
 // otherwise the request will be handled by DefaultSessionManager
-func (s *WebTeleportServer) IsWebTeleportRequest(r *http.Request) bool {
+func (s *Relay) IsWebTeleportRequest(r *http.Request) bool {
 	var (
 		origin, _, _ = strings.Cut(r.Host, ":")
 
@@ -99,7 +100,7 @@ func (s *WebTeleportServer) IsWebTeleportRequest(r *http.Request) bool {
 	return isWebTeleport
 }
 
-func (s *WebTeleportServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// passthrough normal requests to next:
 	// 1. simple http / websockets (Host: x.localhost)
 	// 2. webtransport (Host: x.localhost:300, not yet supported by reverseproxy)
@@ -125,7 +126,7 @@ func (s *WebTeleportServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		slog.Warn(fmt.Sprintf("session init failed: %s", err))
 		return
 	}
-	candidates := ParseDomainCandidates(r.URL.Path)
+	candidates := utils.ParseDomainCandidates(r.URL.Path)
 	clobber := r.URL.Query().Get("clobber")
 	err = session.DefaultSessionManager.Lease(currentSession, candidates, clobber)
 	if err != nil {
