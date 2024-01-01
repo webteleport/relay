@@ -7,12 +7,12 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/caddyserver/certmagic"
 	"github.com/libdns/digitalocean"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
-	"github.com/webteleport/server/envs"
 	"github.com/webteleport/server/session"
 )
 
@@ -48,27 +48,21 @@ func init() {
 	getCertificatesOnDemand()
 }
 
-func NewServerTLS(next http.Handler, tlsConfig *tls.Config) *webtransport.Server {
+func NewServerTLS(host, port string, next http.Handler, tlsConfig *tls.Config) *webtransport.Server {
+	session.DefaultSessionManager.HOST = host
 	s := &webtransport.Server{
 		CheckOrigin: func(*http.Request) bool { return true },
 	}
+	wts := &WebTeleportServer{
+		Server: s,
+		Next:   next,
+		HOST:   host,
+	}
 	s.H3 = http3.Server{
-		Addr:            envs.UDP_PORT,
-		Handler:         &WebTeleportServer{s, next},
+		Addr:            port,
+		Handler:         wts,
 		EnableDatagrams: true,
 		TLSConfig:       tlsConfig,
-	}
-	return s
-}
-
-func NewServer(next http.Handler) *webtransport.Server {
-	s := &webtransport.Server{
-		CheckOrigin: func(*http.Request) bool { return true },
-	}
-	s.H3 = http3.Server{
-		Addr:            envs.UDP_PORT,
-		Handler:         &WebTeleportServer{s, next},
-		EnableDatagrams: true,
 	}
 	return s
 }
@@ -79,13 +73,37 @@ func NewServer(next http.Handler) *webtransport.Server {
 type WebTeleportServer struct {
 	*webtransport.Server
 	Next http.Handler
+	HOST string
+}
+
+// IsWebTeleportRequest tells if the incoming request should be treated as UFO request
+//
+// An UFO request must meet all criteria:
+//
+// - r.Proto == "webtransport"
+// - r.Method == "CONNECT"
+// - origin (r.Host without port) matches HOST
+//
+// if all true, it will be upgraded into a webtransport session
+// otherwise the request will be handled by DefaultSessionManager
+func (s *WebTeleportServer) IsWebTeleportRequest(r *http.Request) bool {
+	var (
+		origin, _, _ = strings.Cut(r.Host, ":")
+
+		isWebtransport = r.Proto == "webtransport"
+		isConnect      = r.Method == http.MethodConnect
+		isOrigin       = origin == s.HOST
+
+		isWebTeleport = isWebtransport && isConnect && isOrigin
+	)
+	return isWebTeleport
 }
 
 func (s *WebTeleportServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// passthrough normal requests to next:
 	// 1. simple http / websockets (Host: x.localhost)
 	// 2. webtransport (Host: x.localhost:300, not yet supported by reverseproxy)
-	if !IsWebTeleportRequest(r) {
+	if !s.IsWebTeleportRequest(r) {
 		s.Next.ServeHTTP(w, r)
 		return
 	}

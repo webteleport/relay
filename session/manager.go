@@ -14,12 +14,12 @@ import (
 	"time"
 
 	"github.com/elazarl/goproxy"
-	"github.com/webteleport/server/envs"
 	"github.com/webteleport/utils"
 	"golang.org/x/net/idna"
 )
 
 var DefaultSessionManager = &SessionManager{
+	HOST:     "<unknown>",
 	counter:  0,
 	sessions: map[string]*Session{},
 	ssnstamp: map[string]time.Time{},
@@ -28,6 +28,7 @@ var DefaultSessionManager = &SessionManager{
 }
 
 type SessionManager struct {
+	HOST     string
 	counter  int
 	sessions map[string]*Session
 	ssnstamp map[string]time.Time
@@ -96,7 +97,7 @@ func (sm *SessionManager) Lease(ssn *Session, candidates []string, clobber strin
 
 	// Try to lease the first available subdomain if candidates are provided
 	for _, pfx := range candidates {
-		k := fmt.Sprintf("%s.%s", pfx, envs.HOST)
+		k := fmt.Sprintf("%s.%s", pfx, sm.HOST)
 		if ssn, exist := sm.Get(k); !exist || canClobber(ssn, clobber) {
 			leaseCandidate = k
 			break
@@ -112,7 +113,7 @@ func (sm *SessionManager) Lease(ssn *Session, candidates []string, clobber strin
 
 	// If no candidates were specified, generate a random subdomain
 	if leaseCandidate == "" {
-		leaseCandidate = fmt.Sprintf("%d.%s", sm.counter, envs.HOST)
+		leaseCandidate = fmt.Sprintf("%d.%s", sm.counter, sm.HOST)
 	}
 
 	// Notify the client of the leaseCandidate
@@ -201,12 +202,11 @@ func (sm *SessionManager) IncrementVisit(k string) {
 }
 
 func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Alt-Svc", envs.ALT_SVC)
 	// for HTTP_PROXY r.Method = GET && r.Host = google.com
 	// for HTTPs_PROXY r.Method = GET && r.Host = google.com:443
 	// they are currently not supported and will be handled by the 404 handler
 	origin, _, _ := strings.Cut(r.Host, ":")
-	if origin == envs.HOST {
+	if origin == sm.HOST {
 		sm.IndexHandler(w, r)
 		return
 	}
