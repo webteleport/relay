@@ -13,7 +13,7 @@ import (
 	"github.com/libdns/digitalocean"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
-	"github.com/webteleport/server/session"
+	"github.com/webteleport/relay/session"
 )
 
 var EmailName = "btwiuse"

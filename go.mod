@@ -1,4 +1,4 @@
-module github.com/webteleport/server
+module github.com/webteleport/relay
 
 go 1.21
 
