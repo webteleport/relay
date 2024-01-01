@@ -8,7 +8,7 @@ require (
 	github.com/libdns/digitalocean v0.0.0-20230728223659-4f9064657aea
 	github.com/quic-go/quic-go v0.40.1
 	github.com/quic-go/webtransport-go v0.6.0
-	github.com/webteleport/utils v0.0.6
+	github.com/webteleport/utils v0.0.7
 	github.com/webteleport/webteleport v0.2.19
 	golang.org/x/net v0.17.0
 )
@@ -16,10 +16,12 @@ require (
 require (
 	github.com/digitalocean/godo v1.41.0 // indirect
 	github.com/ebi-yade/altsvc-go v0.1.1 // indirect
+	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/google/pprof v0.0.0-20230821062121-407c9e7a662f // indirect
+	github.com/gorilla/handlers v1.5.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/libdns/libdns v0.2.1 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect

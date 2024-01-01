@@ -15,6 +15,7 @@ import (
 
 	"github.com/elazarl/goproxy"
 	"github.com/webteleport/server/envs"
+	"github.com/webteleport/utils"
 	"golang.org/x/net/idna"
 )
 
@@ -140,10 +141,6 @@ func (sm *SessionManager) Ping(ssn *Session) {
 	sm.DelSession(ssn)
 }
 
-func (sm *SessionManager) NotFoundHandler(w http.ResponseWriter, r *http.Request) {
-	NotFoundHandler().ServeHTTP(w, r)
-}
-
 func (sm *SessionManager) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = true
@@ -183,12 +180,17 @@ func (sm *SessionManager) ApiSessionsHandler(w http.ResponseWriter, r *http.Requ
 	w.Write(resp)
 }
 
+func NotFoundHealth(w http.ResponseWriter, r *http.Request) {
+	notFound := utils.HostNotFoundHandler()
+	utils.WellKnownHealthMiddleware(notFound).ServeHTTP(w, r)
+}
+
 func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/api/sessions":
 		sm.ApiSessionsHandler(w, r)
 	default:
-		sm.NotFoundHandler(w, r)
+		NotFoundHealth(w, r)
 	}
 }
 
@@ -215,7 +217,7 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			sm.ConnectHandler(w, r)
 			return
 		}
-		sm.NotFoundHandler(w, r)
+		utils.HostNotFoundHandler().ServeHTTP(w, r)
 		return
 	}
 
