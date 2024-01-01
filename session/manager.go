@@ -144,7 +144,7 @@ func (sm *SessionManager) Ping(ssn *Session) {
 
 func (sm *SessionManager) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	proxy := goproxy.NewProxyHttpServer()
-	proxy.Verbose = true
+	proxy.Verbose = false
 	proxy.ServeHTTP(w, r)
 }
 

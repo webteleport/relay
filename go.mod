@@ -8,7 +8,7 @@ require (
 	github.com/libdns/digitalocean v0.0.0-20230728223659-4f9064657aea
 	github.com/quic-go/quic-go v0.40.1
 	github.com/quic-go/webtransport-go v0.6.0
-	github.com/webteleport/utils v0.0.9
+	github.com/webteleport/utils v0.1.1
 	github.com/webteleport/webteleport v0.2.20
 	golang.org/x/net v0.17.0
 )
