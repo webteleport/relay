@@ -134,4 +134,5 @@ func (s *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	go session.DefaultSessionManager.Ping(currentSession)
+	go session.DefaultSessionManager.Scan(currentSession)
 }

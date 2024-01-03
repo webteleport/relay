@@ -1,6 +1,7 @@
 package session
 
 import (
+	"bufio"
 	"context"
 	"expvar"
 	"fmt"
@@ -141,6 +142,24 @@ func (sm *SessionManager) Ping(ssn *Session) {
 		}
 	}
 	sm.DelSession(ssn)
+}
+
+func (sm *SessionManager) Scan(ssn *Session) {
+	scanner := bufio.NewScanner(ssn.Controller)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "PONG" {
+			// currently client reply nothing to server PING's
+			// so this is a noop
+			continue
+		}
+		if line == "CLOSE" {
+			// close session immediately
+			sm.DelSession(ssn)
+			break
+		}
+		slog.Warn(fmt.Sprintf("stm0: unknown command: %s", line))
+	}
 }
 
 func (sm *SessionManager) ConnectHandler(w http.ResponseWriter, r *http.Request) {
