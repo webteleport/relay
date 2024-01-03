@@ -190,6 +190,8 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/api/sessions":
 		sm.ApiSessionsHandler(w, r)
+	case "/debug/vars":
+		expvar.Handler().ServeHTTP(w, r)
 	default:
 		NotFoundHealth(w, r)
 	}
