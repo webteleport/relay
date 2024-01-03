@@ -49,5 +49,6 @@ func (ssn *Session) OpenConn(ctx context.Context) (net.Conn, error) {
 		Stream:  stream,
 		Session: ssn.Session,
 	}
+	webteleport.ConnsOpened.Add(1)
 	return conn, nil
 }
