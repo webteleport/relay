@@ -238,12 +238,19 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			ConnsRelaySpawned.Add(1)
 			return ssn.OpenConn(ctx)
 		},
+		MaxIdleConns:    100,
+		IdleConnTimeout: 90 * time.Second,
 	}
 	rp := &httputil.ReverseProxy{
 		Director:  dr,
 		Transport: tr,
 	}
 	rp.ServeHTTP(w, r)
+	ConnsRelayEnded.Add(1)
 }
+
+var ConnsRelaySpawned = expvar.NewInt("connsRelaySpawned")
+var ConnsRelayEnded = expvar.NewInt("connsRelayEnded")
