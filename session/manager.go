@@ -10,12 +10,14 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"os"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/elazarl/goproxy"
+	"github.com/elazarl/goproxy/ext/auth"
 	"github.com/webteleport/utils"
 	"golang.org/x/net/idna"
 )
@@ -165,6 +167,19 @@ func (sm *SessionManager) Scan(ssn *Session) {
 func (sm *SessionManager) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = false
+
+	// Create a BasicAuth middleware with the provided credentials
+	basic := auth.BasicConnect(
+		"Restricted",
+		func(user, pass string) bool {
+			ok := user != "" && pass != ""
+			return ok
+		},
+	)
+
+	// Use the BasicAuth middleware with the proxy server
+	proxy.OnRequest().HandleConnect(basic)
+
 	proxy.ServeHTTP(w, r)
 }
 
@@ -235,7 +250,7 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ssn, ok := sm.Get(r.Host)
 	if !ok {
-		if r.Method == http.MethodConnect {
+		if r.Method == http.MethodConnect && os.Getenv("CONNECT") != "" {
 			sm.ConnectHandler(w, r)
 			return
 		}

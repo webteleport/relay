@@ -2,13 +2,17 @@ module github.com/webteleport/relay
 
 go 1.21
 
+// replace github.com/webteleport/webteleport => ../webteleport
+// replace github.com/webteleport/utils => ../utils
+
 require (
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/elazarl/goproxy v0.0.0-20231117061959-7cc037d33fb5
+	github.com/elazarl/goproxy/ext v0.0.0-20190711103511-473e67f1d7d2
 	github.com/libdns/digitalocean v0.0.0-20230728223659-4f9064657aea
 	github.com/quic-go/quic-go v0.40.1
 	github.com/quic-go/webtransport-go v0.6.0
-	github.com/webteleport/utils v0.1.2
+	github.com/webteleport/utils v0.1.6
 	github.com/webteleport/webteleport v0.2.23
 	golang.org/x/net v0.17.0
 )
