@@ -88,6 +88,9 @@ type Relay struct {
 // if all true, it will be upgraded into a webtransport session
 // otherwise the request will be handled by DefaultSessionManager
 func (s *Relay) IsWebTeleportRequest(r *http.Request) bool {
+	if r.Query().Get("x-webteleport-upgrade") != "" {
+		return true
+	}
 	var (
 		origin, _, _ = strings.Cut(r.Host, ":")
 
