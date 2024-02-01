@@ -20,12 +20,18 @@ import (
 	"github.com/btwiuse/tags"
 	"github.com/elazarl/goproxy"
 	"github.com/elazarl/goproxy/ext/auth"
-	"github.com/webteleport/relay/session"
+	"github.com/webteleport/relay/webtransport"
+
+	// TODO: add
+	// "github.com/webteleport/relay/websocket"
 	"github.com/webteleport/utils"
 	"golang.org/x/net/idna"
 )
 
-var _ Session = (*session.Session)(nil)
+var _ Session = (*webtransport.Session)(nil)
+
+// TODO: support websocket.Session
+// var _ Session = (*websocket.Session)(nil)
 
 type Session interface {
 	OpenConn(context.Context) (net.Conn, error)
@@ -36,7 +42,7 @@ type Session interface {
 var DefaultSessionManager = &SessionManager{
 	HOST:     "<unknown>",
 	counter:  0,
-	sessions: map[string]*session.Session{},
+	sessions: map[string]Session{},
 	ssnstamp: map[string]time.Time{},
 	ssn_cntr: map[string]int{},
 	slock:    &sync.RWMutex{},
@@ -45,7 +51,7 @@ var DefaultSessionManager = &SessionManager{
 type SessionManager struct {
 	HOST     string
 	counter  int
-	sessions map[string]*session.Session
+	sessions map[string]Session
 	ssnstamp map[string]time.Time
 	ssn_cntr map[string]int
 	slock    *sync.RWMutex
@@ -64,7 +70,7 @@ func (sm *SessionManager) Del(k string) error {
 	return nil
 }
 
-func (sm *SessionManager) DelSession(ssn *session.Session) {
+func (sm *SessionManager) DelSession(ssn Session) {
 	sm.slock.Lock()
 	for k, v := range sm.sessions {
 		if v == ssn {
@@ -78,7 +84,7 @@ func (sm *SessionManager) DelSession(ssn *session.Session) {
 	sm.slock.Unlock()
 }
 
-func (sm *SessionManager) Get(k string) (*session.Session, bool) {
+func (sm *SessionManager) Get(k string) (Session, bool) {
 	k, _ = idna.ToASCII(k)
 	host, _, _ := strings.Cut(k, ":")
 	sm.slock.RLock()
@@ -87,7 +93,7 @@ func (sm *SessionManager) Get(k string) (*session.Session, bool) {
 	return ssn, ok
 }
 
-func (sm *SessionManager) Add(k string, ssn *session.Session) error {
+func (sm *SessionManager) Add(k string, ssn Session) error {
 	k, err := idna.ToASCII(k)
 	if err != nil {
 		return err
@@ -102,11 +108,11 @@ func (sm *SessionManager) Add(k string, ssn *session.Session) error {
 }
 
 // canClobber checks if the clobber string matches the session's clobber value
-func canClobber(ssn *session.Session, clobber string) bool {
-	return clobber != "" && ssn.Values.Get("clobber") == clobber
+func canClobber(ssn Session, clobber string) bool {
+	return clobber != "" && ssn.GetValues().Get("clobber") == clobber
 }
 
-func (sm *SessionManager) Lease(ssn *session.Session, candidates []string, clobber string) error {
+func (sm *SessionManager) Lease(ssn Session, candidates []string, clobber string) error {
 	allowRandom := len(candidates) == 0
 	leaseCandidate := ""
 
@@ -122,7 +128,7 @@ func (sm *SessionManager) Lease(ssn *session.Session, candidates []string, clobb
 	// If no specified candidates are available and random is not allowed, return with an error
 	if leaseCandidate == "" && !allowRandom {
 		emsg := fmt.Sprintf("ERR %s: %v\n", "none of your requested subdomains are currently available", candidates)
-		_, err := io.WriteString(ssn.Controller, emsg)
+		_, err := io.WriteString(ssn.GetController(), emsg)
 		return err
 	}
 
@@ -132,7 +138,7 @@ func (sm *SessionManager) Lease(ssn *session.Session, candidates []string, clobb
 	}
 
 	// Notify the client of the leaseCandidate
-	if _, err := io.WriteString(ssn.Controller, fmt.Sprintf("HOST %s\n", leaseCandidate)); err != nil {
+	if _, err := io.WriteString(ssn.GetController(), fmt.Sprintf("HOST %s\n", leaseCandidate)); err != nil {
 		return err
 	}
 
@@ -146,10 +152,10 @@ func (sm *SessionManager) Lease(ssn *session.Session, candidates []string, clobb
 
 var PingInterval = 5 * time.Second
 
-func (sm *SessionManager) Ping(ssn *session.Session) {
+func (sm *SessionManager) Ping(ssn Session) {
 	for {
 		time.Sleep(PingInterval)
-		_, err := io.WriteString(ssn.Controller, fmt.Sprintf("%s\n", "PING"))
+		_, err := io.WriteString(ssn.GetController(), fmt.Sprintf("%s\n", "PING"))
 		if err != nil {
 			break
 		}
@@ -157,8 +163,8 @@ func (sm *SessionManager) Ping(ssn *session.Session) {
 	sm.DelSession(ssn)
 }
 
-func (sm *SessionManager) Scan(ssn *session.Session) {
-	scanner := bufio.NewScanner(ssn.Controller)
+func (sm *SessionManager) Scan(ssn Session) {
+	scanner := bufio.NewScanner(ssn.GetController())
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "PONG" {
@@ -206,7 +212,7 @@ func (sm *SessionManager) ApiSessionsHandler(w http.ResponseWriter, r *http.Requ
 	all := []Record{}
 	for host := range sm.sessions {
 		since := sm.ssnstamp[host]
-		tags := tags.Tags{Values: sm.sessions[host].Values}
+		tags := tags.Tags{Values: sm.sessions[host].GetValues()}
 		visited := sm.ssn_cntr[host]
 		record := Record{
 			Host:      host,
