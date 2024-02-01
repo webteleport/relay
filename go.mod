@@ -2,8 +2,7 @@ module github.com/webteleport/relay
 
 go 1.21.6
 
-replace github.com/webteleport/webteleport => ../webteleport
-
+// replace github.com/webteleport/webteleport => ../webteleport
 // replace github.com/webteleport/utils => ../utils
 
 require (
@@ -16,7 +15,7 @@ require (
 	github.com/quic-go/quic-go v0.41.0
 	github.com/quic-go/webtransport-go v0.6.0
 	github.com/webteleport/utils v0.2.5
-	github.com/webteleport/webteleport v0.3.3
+	github.com/webteleport/webteleport v0.4.1
 	golang.org/x/net v0.20.0
 	k0s.io/pkg/wrap v0.1.12
 )

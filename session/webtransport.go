@@ -53,10 +53,6 @@ func (ssn *WebtransportSession) OpenConn(ctx context.Context) (net.Conn, error) 
 	}
 	// log.Println(`MARK`, stream)
 	// MARK
-	conn := &webtransport.StreamConn{
-		Stream:  stream,
-		Session: ssn.Session,
-	}
-	webtransport.WebtransportConnsOpened.Add(1)
+	conn := webtransport.NewOpenedConn(stream, ssn.Session)
 	return conn, nil
 }

@@ -10,15 +10,11 @@ import (
 	"strings"
 
 	"github.com/caddyserver/certmagic"
-	"github.com/hashicorp/yamux"
 	"github.com/libdns/digitalocean"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
 	"github.com/webteleport/relay/manager"
 	"github.com/webteleport/relay/session"
-	"github.com/webteleport/utils"
-
-	"k0s.io/pkg/wrap"
 )
 
 func getCertificatesOnDemand() {
@@ -91,7 +87,11 @@ type Relay struct {
 //
 // if all true, it will be upgraded into a webtransport session
 // otherwise the request will be handled by DefaultSessionManager
-func (s *Relay) IsWebteleportUpgrade(r *http.Request) (result bool) {
+func (s *Relay) IsWebtransportUpgrade(r *http.Request) (result bool) {
+	if r.URL.Query().Get("x-webtransport-upgrade") != "" {
+		return true
+	}
+	// TODO remove in the future
 	if r.URL.Query().Get("x-webteleport-upgrade") != "" {
 		return true
 	}
@@ -125,14 +125,13 @@ func (s *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// passthrough normal requests to next:
 	// 1. simple http / websockets (Host: x.localhost)
 	// 2. webtransport (Host: x.localhost:300, not yet supported by reverseproxy)
-	if !s.IsWebteleportUpgrade(r) || !s.IsWebsocketUpgrade(r) {
-		s.Next.ServeHTTP(w, r)
-		return
-	}
-	slog.Info(fmt.Sprint("🛸", r.RemoteAddr, r.Proto, r.Method, r.Host, r.URL.Path, r.URL.RawQuery))
 
+	println(r.URL.String())
 	var currentSession manager.Session
-	if s.IsWebteleportUpgrade(r) {
+	switch {
+	case s.IsWebtransportUpgrade(r):
+		slog.Info(fmt.Sprint("🛸 webtransport", r.RemoteAddr, r.Proto, r.Method, r.Host, r.URL.Path, r.URL.RawQuery))
+
 		// handle ufo client registration
 		// Host: ufo.k0s.io:300
 		ssn, err := s.Upgrade(w, r)
@@ -150,44 +149,60 @@ func (s *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			slog.Warn(fmt.Sprintf("session init failed: %s", err))
 			return
 		}
-	}
-	if s.IsWebsocketUpgrade(r) {
+		manager.AddManagerSession(currentSession, r)
+	case s.IsWebsocketUpgrade(r): // this case will never be reached, since it's handled in DefaultSessionManager
+		slog.Info(fmt.Sprint("🛸 websocket", r.RemoteAddr, r.Proto, r.Method, r.Host, r.URL.Path, r.URL.RawQuery))
 		// handle ufo client registration
 		// Host: ufo.k0s.io:300
-		conn, err := wrap.Wrconn(w, r)
+		currentSession, err := manager.UpgradeWebsocketSession(w, r)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
-			w.WriteHeader(500)
+			slog.Warn(fmt.Sprintf("upgrade websocket session failed: %s", err))
 			return
 		}
-		ssn, err := yamux.Server(conn, nil)
-		if err != nil {
-			slog.Warn(fmt.Sprintf("creating yamux.Server failed: %s", err))
-			w.WriteHeader(500)
-			return
-		}
-		currentSession = &session.WebsocketSession{
-			Session: ssn,
-			Values:  r.URL.Query(),
-		}
-		err = currentSession.InitController(context.Background())
-		if err != nil {
-			slog.Warn(fmt.Sprintf("session init failed: %s", err))
-			return
-		}
+		manager.AddManagerSession(currentSession, r)
+	default:
+		s.Next.ServeHTTP(w, r)
 	}
-	if currentSession == nil {
-		slog.Warn("currentSession is nil, which should not happen!")
-		return
-	}
+}
 
-	candidates := utils.ParseDomainCandidates(r.URL.Path)
-	clobber := r.URL.Query().Get("clobber")
-	err := manager.DefaultSessionManager.Lease(currentSession, candidates, clobber)
-	if err != nil {
+/*
+func AddManagerSession(currentSession manager.Session, r *http.Request) {
+	// common logic
+	var (
+		candidates = utils.ParseDomainCandidates(r.URL.Path)
+		clobber    = r.URL.Query().Get("clobber")
+	)
+
+	if err := manager.DefaultSessionManager.Lease(currentSession, candidates, clobber); err != nil {
 		slog.Warn(fmt.Sprintf("leasing failed: %s", err))
 		return
 	}
 	go manager.DefaultSessionManager.Ping(currentSession)
 	go manager.DefaultSessionManager.Scan(currentSession)
 }
+
+func UpgradeWebsocketSession(w http.ResponseWriter, r *http.Request) (manager.Session, error) {
+	conn, err := wrap.Wrconn(w, r)
+	if err != nil {
+		slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
+		w.WriteHeader(500)
+		return nil, err
+	}
+	ssn, err := yamux.Server(conn, nil)
+	if err != nil {
+		slog.Warn(fmt.Sprintf("creating yamux.Server failed: %s", err))
+		w.WriteHeader(500)
+		return nil, err
+	}
+	managerSession := &session.WebsocketSession{
+		Session: ssn,
+		Values:  r.URL.Query(),
+	}
+	err = managerSession.InitController(context.Background())
+	if err != nil {
+		slog.Warn(fmt.Sprintf("session init failed: %s", err))
+		return nil, err
+	}
+	return managerSession, nil
+}
+*/

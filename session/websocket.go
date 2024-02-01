@@ -53,9 +53,6 @@ func (ssn *WebsocketSession) OpenConn(_ctx context.Context) (net.Conn, error) {
 	}
 	// log.Println(`MARK`, stream)
 	// MARK
-	conn := &websocket.StreamConn{
-		Stream: stream,
-	}
-	websocket.WebsocketConnsOpened.Add(1)
+	conn := websocket.NewOpenedConn(stream)
 	return conn, nil
 }

@@ -20,9 +20,11 @@ import (
 	"github.com/btwiuse/tags"
 	"github.com/elazarl/goproxy"
 	"github.com/elazarl/goproxy/ext/auth"
+	"github.com/hashicorp/yamux"
 	"github.com/webteleport/relay/session"
 	"github.com/webteleport/utils"
 	"golang.org/x/net/idna"
+	"k0s.io/pkg/wrap"
 )
 
 var _ Session = (*session.WebsocketSession)(nil)
@@ -252,6 +254,15 @@ func (sm *SessionManager) IncrementVisit(k string) {
 }
 
 func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if IsWebsocketUpgrade(r) {
+		currentSession, err := UpgradeWebsocketSession(w, r)
+		if err != nil {
+			slog.Warn(fmt.Sprintf("upgrade websocket session failed: %s", err))
+			return
+		}
+		AddManagerSession(currentSession, r)
+		return
+	}
 	// for HTTP_PROXY r.Method = GET && r.Host = google.com
 	// for HTTPs_PROXY r.Method = GET && r.Host = google.com:443
 	// they are currently not supported and will be handled by the 404 handler
@@ -297,4 +308,47 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	rp.ServeHTTP(w, r)
 	WebteleportConnsRelayClosed.Add(1)
+}
+
+func AddManagerSession(currentSession Session, r *http.Request) {
+	var (
+		candidates = utils.ParseDomainCandidates(r.URL.Path)
+		clobber    = r.URL.Query().Get("clobber")
+	)
+
+	if err := DefaultSessionManager.Lease(currentSession, candidates, clobber); err != nil {
+		slog.Warn(fmt.Sprintf("leasing failed: %s", err))
+		return
+	}
+	go DefaultSessionManager.Ping(currentSession)
+	go DefaultSessionManager.Scan(currentSession)
+}
+
+func UpgradeWebsocketSession(w http.ResponseWriter, r *http.Request) (Session, error) {
+	conn, err := wrap.Wrconn(w, r)
+	if err != nil {
+		slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
+		w.WriteHeader(500)
+		return nil, err
+	}
+	ssn, err := yamux.Server(conn, nil)
+	if err != nil {
+		slog.Warn(fmt.Sprintf("creating yamux.Server failed: %s", err))
+		w.WriteHeader(500)
+		return nil, err
+	}
+	managerSession := &session.WebsocketSession{
+		Session: ssn,
+		Values:  r.URL.Query(),
+	}
+	err = managerSession.InitController(context.Background())
+	if err != nil {
+		slog.Warn(fmt.Sprintf("session init failed: %s", err))
+		return nil, err
+	}
+	return managerSession, nil
+}
+
+func IsWebsocketUpgrade(r *http.Request) (result bool) {
+	return r.URL.Query().Get("x-websocket-upgrade") != ""
 }
