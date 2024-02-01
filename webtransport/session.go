@@ -10,21 +10,21 @@ import (
 	"github.com/webteleport/webteleport"
 )
 
-type Session struct {
+type WebtransportSession struct {
 	*webtransport.Session
 	Controller net.Conn
 	Values     url.Values
 }
 
-func (ssn *Session) GetController() net.Conn {
+func (ssn *WebtransportSession) GetController() net.Conn {
 	return ssn.Controller
 }
 
-func (ssn *Session) GetValues() url.Values {
+func (ssn *WebtransportSession) GetValues() url.Values {
 	return ssn.Values
 }
 
-func (ssn *Session) InitController(ctx context.Context) error {
+func (ssn *WebtransportSession) InitController(ctx context.Context) error {
 	if ssn.Controller != nil {
 		return nil
 	}
@@ -36,7 +36,7 @@ func (ssn *Session) InitController(ctx context.Context) error {
 	return nil
 }
 
-func (ssn *Session) OpenConn(ctx context.Context) (net.Conn, error) {
+func (ssn *WebtransportSession) OpenConn(ctx context.Context) (net.Conn, error) {
 	// when there is a timeout, it still panics before MARK
 	//
 	// ctx, _ = context.WithTimeout(ctx, 3*time.Second)

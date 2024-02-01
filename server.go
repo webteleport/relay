@@ -121,7 +121,7 @@ func (s *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		return
 	}
-	currentSession := &webtransport.Session{
+	currentSession := &webtransport.WebtransportSession{
 		Session: ssn,
 		Values:  r.URL.Query(),
 	}

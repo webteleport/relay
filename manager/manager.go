@@ -28,10 +28,10 @@ import (
 	"golang.org/x/net/idna"
 )
 
-var _ Session = (*webtransport.Session)(nil)
+var _ Session = (*webtransport.WebtransportSession)(nil)
 
-// TODO: support websocket.Session
-// var _ Session = (*websocket.Session)(nil)
+// TODO: support websocket.WebsocketSession
+// var _ Session = (*websocket.WebsocketSession)(nil)
 
 type Session interface {
 	OpenConn(context.Context) (net.Conn, error)
