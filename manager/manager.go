@@ -20,18 +20,14 @@ import (
 	"github.com/btwiuse/tags"
 	"github.com/elazarl/goproxy"
 	"github.com/elazarl/goproxy/ext/auth"
-	"github.com/webteleport/relay/webtransport"
-
-	// TODO: add
-	// "github.com/webteleport/relay/websocket"
+	"github.com/webteleport/relay/session"
 	"github.com/webteleport/utils"
 	"golang.org/x/net/idna"
 )
 
-var _ Session = (*webtransport.WebtransportSession)(nil)
-
-// TODO: support websocket.WebsocketSession
-// var _ Session = (*websocket.WebsocketSession)(nil)
+// TODO: support websocket session
+// var _ Session = (*session.WebsocketSession)(nil)
+var _ Session = (*session.WebtransportSession)(nil)
 
 type Session interface {
 	OpenConn(context.Context) (net.Conn, error)

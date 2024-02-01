@@ -1,4 +1,4 @@
-package webtransport
+package session
 
 import (
 	"context"

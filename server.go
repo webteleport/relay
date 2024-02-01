@@ -12,9 +12,9 @@ import (
 	"github.com/caddyserver/certmagic"
 	"github.com/libdns/digitalocean"
 	"github.com/quic-go/quic-go/http3"
-	webtransportGo "github.com/quic-go/webtransport-go"
+	"github.com/quic-go/webtransport-go"
 	"github.com/webteleport/relay/manager"
-	"github.com/webteleport/relay/webtransport"
+	"github.com/webteleport/relay/session"
 	"github.com/webteleport/utils"
 )
 
@@ -52,7 +52,7 @@ func init() {
 
 func New(host, port string, next http.Handler, tlsConfig *tls.Config) *Relay {
 	manager.DefaultSessionManager.HOST = host
-	s := &webtransportGo.Server{
+	s := &webtransport.Server{
 		CheckOrigin: func(*http.Request) bool { return true },
 	}
 	r := &Relay{
@@ -73,7 +73,7 @@ func New(host, port string, next http.Handler, tlsConfig *tls.Config) *Relay {
 // - UFO client registration (CONNECT HOST)
 // - requests over HTTP/3 (others)
 type Relay struct {
-	*webtransportGo.Server
+	*webtransport.Server
 	Next http.Handler
 	HOST string
 }
@@ -121,7 +121,7 @@ func (s *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		return
 	}
-	currentSession := &webtransport.WebtransportSession{
+	currentSession := &session.WebtransportSession{
 		Session: ssn,
 		Values:  r.URL.Query(),
 	}
