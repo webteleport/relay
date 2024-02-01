@@ -13,6 +13,7 @@ import (
 	"github.com/libdns/digitalocean"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
+	"github.com/webteleport/relay/manager"
 	"github.com/webteleport/relay/session"
 	"github.com/webteleport/utils"
 )
@@ -50,7 +51,7 @@ func init() {
 }
 
 func New(host, port string, next http.Handler, tlsConfig *tls.Config) *Relay {
-	session.DefaultSessionManager.HOST = host
+	manager.DefaultSessionManager.HOST = host
 	s := &webtransport.Server{
 		CheckOrigin: func(*http.Request) bool { return true },
 	}
@@ -131,11 +132,11 @@ func (s *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	candidates := utils.ParseDomainCandidates(r.URL.Path)
 	clobber := r.URL.Query().Get("clobber")
-	err = session.DefaultSessionManager.Lease(currentSession, candidates, clobber)
+	err = manager.DefaultSessionManager.Lease(currentSession, candidates, clobber)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("leasing failed: %s", err))
 		return
 	}
-	go session.DefaultSessionManager.Ping(currentSession)
-	go session.DefaultSessionManager.Scan(currentSession)
+	go manager.DefaultSessionManager.Ping(currentSession)
+	go manager.DefaultSessionManager.Scan(currentSession)
 }
