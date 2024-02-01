@@ -10,12 +10,15 @@ import (
 	"strings"
 
 	"github.com/caddyserver/certmagic"
+	"github.com/hashicorp/yamux"
 	"github.com/libdns/digitalocean"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
 	"github.com/webteleport/relay/manager"
 	"github.com/webteleport/relay/session"
 	"github.com/webteleport/utils"
+
+	"k0s.io/pkg/wrap"
 )
 
 func getCertificatesOnDemand() {
@@ -88,7 +91,7 @@ type Relay struct {
 //
 // if all true, it will be upgraded into a webtransport session
 // otherwise the request will be handled by DefaultSessionManager
-func (s *Relay) IsWebTeleportRequest(r *http.Request) bool {
+func (s *Relay) IsWebteleportUpgrade(r *http.Request) (result bool) {
 	if r.URL.Query().Get("x-webteleport-upgrade") != "" {
 		return true
 	}
@@ -98,41 +101,89 @@ func (s *Relay) IsWebTeleportRequest(r *http.Request) bool {
 		isWebtransport = r.Proto == "webtransport"
 		isConnect      = r.Method == http.MethodConnect
 		isOrigin       = origin == s.HOST
-
-		isWebTeleport = isWebtransport && isConnect && isOrigin
 	)
-	return isWebTeleport
+	result = isWebtransport && isConnect && isOrigin
+	return
+}
+
+func (s *Relay) IsWebsocketUpgrade(r *http.Request) (result bool) {
+	if r.URL.Query().Get("x-websocket-upgrade") != "" {
+		return true
+	}
+	var (
+		origin, _, _ = strings.Cut(r.Host, ":")
+
+		isWebsocket = (r.Header.Get("Connection") == "upgrade" && r.Header.Get("Upgrade") == "websocket")
+		isGet       = r.Method == http.MethodGet
+		isOrigin    = origin == s.HOST
+	)
+	result = isWebsocket && isGet && isOrigin
+	return
 }
 
 func (s *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// passthrough normal requests to next:
 	// 1. simple http / websockets (Host: x.localhost)
 	// 2. webtransport (Host: x.localhost:300, not yet supported by reverseproxy)
-	if !s.IsWebTeleportRequest(r) {
+	if !s.IsWebteleportUpgrade(r) || !s.IsWebsocketUpgrade(r) {
 		s.Next.ServeHTTP(w, r)
 		return
 	}
 	slog.Info(fmt.Sprint("🛸", r.RemoteAddr, r.Proto, r.Method, r.Host, r.URL.Path, r.URL.RawQuery))
-	// handle ufo client registration
-	// Host: ufo.k0s.io:300
-	ssn, err := s.Upgrade(w, r)
-	if err != nil {
-		slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
-		w.WriteHeader(500)
+
+	var currentSession manager.Session
+	if s.IsWebteleportUpgrade(r) {
+		// handle ufo client registration
+		// Host: ufo.k0s.io:300
+		ssn, err := s.Upgrade(w, r)
+		if err != nil {
+			slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
+			w.WriteHeader(500)
+			return
+		}
+		currentSession = &session.WebtransportSession{
+			Session: ssn,
+			Values:  r.URL.Query(),
+		}
+		err = currentSession.InitController(context.Background())
+		if err != nil {
+			slog.Warn(fmt.Sprintf("session init failed: %s", err))
+			return
+		}
+	}
+	if s.IsWebsocketUpgrade(r) {
+		// handle ufo client registration
+		// Host: ufo.k0s.io:300
+		conn, err := wrap.Wrconn(w, r)
+		if err != nil {
+			slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
+			w.WriteHeader(500)
+			return
+		}
+		ssn, err := yamux.Server(conn, nil)
+		if err != nil {
+			slog.Warn(fmt.Sprintf("creating yamux.Server failed: %s", err))
+			w.WriteHeader(500)
+			return
+		}
+		currentSession = &session.WebsocketSession{
+			Session: ssn,
+			Values:  r.URL.Query(),
+		}
+		err = currentSession.InitController(context.Background())
+		if err != nil {
+			slog.Warn(fmt.Sprintf("session init failed: %s", err))
+			return
+		}
+	}
+	if currentSession == nil {
+		slog.Warn("currentSession is nil, which should not happen!")
 		return
 	}
-	currentSession := &session.WebtransportSession{
-		Session: ssn,
-		Values:  r.URL.Query(),
-	}
-	err = currentSession.InitController(context.Background())
-	if err != nil {
-		slog.Warn(fmt.Sprintf("session init failed: %s", err))
-		return
-	}
+
 	candidates := utils.ParseDomainCandidates(r.URL.Path)
 	clobber := r.URL.Query().Get("clobber")
-	err = manager.DefaultSessionManager.Lease(currentSession, candidates, clobber)
+	err := manager.DefaultSessionManager.Lease(currentSession, candidates, clobber)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("leasing failed: %s", err))
 		return

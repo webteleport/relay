@@ -6,29 +6,29 @@ import (
 	"net"
 	"net/url"
 
-	webtransportGo "github.com/quic-go/webtransport-go"
-	"github.com/webteleport/webteleport/webtransport"
+	"github.com/hashicorp/yamux"
+	"github.com/webteleport/webteleport/websocket"
 )
 
-type WebtransportSession struct {
-	*webtransportGo.Session
+type WebsocketSession struct {
+	*yamux.Session
 	Controller net.Conn
 	Values     url.Values
 }
 
-func (ssn *WebtransportSession) GetController() net.Conn {
+func (ssn *WebsocketSession) GetController() net.Conn {
 	return ssn.Controller
 }
 
-func (ssn *WebtransportSession) GetValues() url.Values {
+func (ssn *WebsocketSession) GetValues() url.Values {
 	return ssn.Values
 }
 
-func (ssn *WebtransportSession) InitController(ctx context.Context) error {
+func (ssn *WebsocketSession) InitController(_ctx context.Context) error {
 	if ssn.Controller != nil {
 		return nil
 	}
-	stm0, err := ssn.OpenConn(ctx)
+	stm0, err := ssn.OpenStream()
 	if err != nil {
 		return err
 	}
@@ -36,13 +36,13 @@ func (ssn *WebtransportSession) InitController(ctx context.Context) error {
 	return nil
 }
 
-func (ssn *WebtransportSession) OpenConn(ctx context.Context) (net.Conn, error) {
+func (ssn *WebsocketSession) OpenConn(_ctx context.Context) (net.Conn, error) {
 	// when there is a timeout, it still panics before MARK
 	//
 	// ctx, _ = context.WithTimeout(ctx, 3*time.Second)
 	//
 	// turns out the stream is empty so need to check stream == nil
-	stream, err := ssn.OpenStreamSync(ctx)
+	stream, err := ssn.OpenStream()
 	if err != nil {
 		return nil, err
 	}
@@ -53,10 +53,9 @@ func (ssn *WebtransportSession) OpenConn(ctx context.Context) (net.Conn, error) 
 	}
 	// log.Println(`MARK`, stream)
 	// MARK
-	conn := &webtransport.StreamConn{
-		Stream:  stream,
-		Session: ssn.Session,
+	conn := &websocket.StreamConn{
+		Stream: stream,
 	}
-	webtransport.WebtransportConnsOpened.Add(1)
+	websocket.WebsocketConnsOpened.Add(1)
 	return conn, nil
 }

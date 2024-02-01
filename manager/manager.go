@@ -25,14 +25,14 @@ import (
 	"golang.org/x/net/idna"
 )
 
-// TODO: support websocket session
-// var _ Session = (*session.WebsocketSession)(nil)
+var _ Session = (*session.WebsocketSession)(nil)
 var _ Session = (*session.WebtransportSession)(nil)
 
 type Session interface {
-	OpenConn(context.Context) (net.Conn, error)
+	InitController(context.Context) error
 	GetController() net.Conn
 	GetValues() url.Values
+	OpenConn(context.Context) (net.Conn, error)
 }
 
 var DefaultSessionManager = &SessionManager{

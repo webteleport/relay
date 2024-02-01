@@ -2,7 +2,8 @@ module github.com/webteleport/relay
 
 go 1.21.6
 
-// replace github.com/webteleport/webteleport => ../webteleport
+replace github.com/webteleport/webteleport => ../webteleport
+
 // replace github.com/webteleport/utils => ../utils
 
 require (
@@ -10,12 +11,14 @@ require (
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/elazarl/goproxy v0.0.0-20231117061959-7cc037d33fb5
 	github.com/elazarl/goproxy/ext v0.0.0-20231117061959-7cc037d33fb5
+	github.com/hashicorp/yamux v0.1.1
 	github.com/libdns/digitalocean v0.0.0-20230728223659-4f9064657aea
 	github.com/quic-go/quic-go v0.41.0
 	github.com/quic-go/webtransport-go v0.6.0
-	github.com/webteleport/utils v0.2.2
+	github.com/webteleport/utils v0.2.5
 	github.com/webteleport/webteleport v0.3.3
 	golang.org/x/net v0.20.0
+	k0s.io/pkg/wrap v0.1.12
 )
 
 require (
@@ -27,6 +30,7 @@ require (
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/google/pprof v0.0.0-20230821062121-407c9e7a662f // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
+	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/libdns/libdns v0.2.1 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -49,4 +53,7 @@ require (
 	golang.org/x/tools v0.17.0 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
+	k0s.io v0.1.12 // indirect
+	k0s.io/pkg/dial v0.1.12 // indirect
+	nhooyr.io/websocket v1.8.10 // indirect
 )
