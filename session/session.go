@@ -16,6 +16,14 @@ type Session struct {
 	Values     url.Values
 }
 
+func (ssn *Session) GetController() net.Conn {
+	return ssn.Controller
+}
+
+func (ssn *Session) GetValues() url.Values {
+	return ssn.Values
+}
+
 func (ssn *Session) InitController(ctx context.Context) error {
 	if ssn.Controller != nil {
 		return nil

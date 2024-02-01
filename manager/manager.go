@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -23,6 +24,14 @@ import (
 	"github.com/webteleport/utils"
 	"golang.org/x/net/idna"
 )
+
+var _ Session = (*session.Session)(nil)
+
+type Session interface {
+	OpenConn(context.Context) (net.Conn, error)
+	GetController() net.Conn
+	GetValues() url.Values
+}
 
 var DefaultSessionManager = &SessionManager{
 	HOST:     "<unknown>",
