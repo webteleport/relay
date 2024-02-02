@@ -55,19 +55,6 @@ type SessionManager struct {
 	slock    *sync.RWMutex
 }
 
-func (sm *SessionManager) Del(k string) error {
-	k, err := idna.ToASCII(k)
-	if err != nil {
-		return err
-	}
-	sm.slock.Lock()
-	delete(sm.sessions, k)
-	delete(sm.ssnstamp, k)
-	delete(sm.ssn_cntr, k)
-	sm.slock.Unlock()
-	return nil
-}
-
 func (sm *SessionManager) DelSession(ssn Session) {
 	sm.slock.Lock()
 	for k, v := range sm.sessions {
@@ -80,6 +67,7 @@ func (sm *SessionManager) DelSession(ssn Session) {
 		}
 	}
 	sm.slock.Unlock()
+	WebteleportSessionsRelayClosed.Add(1)
 }
 
 func (sm *SessionManager) Get(k string) (Session, bool) {
@@ -296,7 +284,7 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			WebteleportConnsRelaySpawned.Add(1)
+			WebteleportStreamsRelaySpawned.Add(1)
 			return ssn.OpenConn(ctx)
 		},
 		MaxIdleConns:    100,
@@ -307,7 +295,7 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Transport: tr,
 	}
 	rp.ServeHTTP(w, r)
-	WebteleportConnsRelayClosed.Add(1)
+	WebteleportStreamsRelayClosed.Add(1)
 }
 
 func AddManagerSession(currentSession Session, r *http.Request) {
@@ -322,6 +310,7 @@ func AddManagerSession(currentSession Session, r *http.Request) {
 	}
 	go DefaultSessionManager.Ping(currentSession)
 	go DefaultSessionManager.Scan(currentSession)
+	WebteleportSessionsRelayAccepted.Add(1)
 }
 
 func UpgradeWebsocketSession(w http.ResponseWriter, r *http.Request) (Session, error) {
