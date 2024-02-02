@@ -14,15 +14,14 @@ require (
 	github.com/libdns/digitalocean v0.0.0-20230728223659-4f9064657aea
 	github.com/quic-go/quic-go v0.41.0
 	github.com/quic-go/webtransport-go v0.6.0
-	github.com/webteleport/utils v0.2.5
-	github.com/webteleport/webteleport v0.4.1
+	github.com/webteleport/utils v0.2.6
+	github.com/webteleport/webteleport v0.4.2
 	golang.org/x/net v0.20.0
 	k0s.io/pkg/wrap v0.1.12
 )
 
 require (
 	github.com/digitalocean/godo v1.41.0 // indirect
-	github.com/ebi-yade/altsvc-go v0.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
