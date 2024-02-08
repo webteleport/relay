@@ -256,7 +256,7 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// they are currently not supported and will be handled by the 404 handler
 	origin, _, _ := strings.Cut(r.Host, ":")
 	if origin == sm.HOST {
-		sm.IndexHandler(w, r)
+		// sm.IndexHandler(w, r)
 		return
 	}
 
