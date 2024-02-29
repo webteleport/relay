@@ -220,19 +220,23 @@ func (sm *SessionManager) ApiSessionsHandler(w http.ResponseWriter, r *http.Requ
 	w.Write(resp)
 }
 
-func NotFoundHealth(w http.ResponseWriter, r *http.Request) {
-	notFound := utils.HostNotFoundHandler()
-	utils.WellKnownHealthMiddleware(notFound).ServeHTTP(w, r)
+func Index() http.Handler {
+	handler := utils.HostNotFoundHandler()
+	if index := utils.LookupEnv("INDEX"); index != nil {
+		handler = utils.ReverseProxy(*index)
+	}
+	return utils.WellKnownHealthMiddleware(handler)
 }
 
 func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
-	case "/api/sessions":
-		sm.ApiSessionsHandler(w, r)
 	case "/debug/vars":
 		expvar.Handler().ServeHTTP(w, r)
+	case "/api/sessions":
+		fallthrough
+		// sm.ApiSessionsHandler(w, r)
 	default:
-		NotFoundHealth(w, r)
+		Index().ServeHTTP(w, r)
 	}
 }
 
@@ -257,7 +261,7 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// they are currently not supported and will be handled by the 404 handler
 	origin, _, _ := strings.Cut(r.Host, ":")
 	if origin == sm.HOST {
-		// sm.IndexHandler(w, r)
+		sm.IndexHandler(w, r)
 		return
 	}
 
