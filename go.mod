@@ -15,10 +15,10 @@ require (
 	github.com/libdns/digitalocean v0.0.0-20230728223659-4f9064657aea
 	github.com/quic-go/quic-go v0.41.0
 	github.com/quic-go/webtransport-go v0.6.0
-	github.com/webteleport/utils v0.2.6
+	github.com/webteleport/utils v0.2.8
 	github.com/webteleport/webteleport v0.4.2
 	golang.org/x/net v0.20.0
-	k0s.io/pkg/wrap v0.1.12
+	k0s.io/pkg/wrap v0.1.14
 )
 
 require (
@@ -54,7 +54,7 @@ require (
 	golang.org/x/tools v0.17.0 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
-	k0s.io v0.1.12 // indirect
+	k0s.io v0.1.14 // indirect
 	k0s.io/pkg/dial v0.1.12 // indirect
 	nhooyr.io/websocket v1.8.10 // indirect
 )
