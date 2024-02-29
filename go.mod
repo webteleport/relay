@@ -1,11 +1,12 @@
 module github.com/webteleport/relay
 
-go 1.21.6
+go 1.22.0
 
 // replace github.com/webteleport/webteleport => ../webteleport
 // replace github.com/webteleport/utils => ../utils
 
 require (
+	github.com/btwiuse/rng v0.0.0
 	github.com/btwiuse/tags v0.0.0
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/elazarl/goproxy v0.0.0-20231117061959-7cc037d33fb5
@@ -22,11 +23,13 @@ require (
 
 require (
 	github.com/digitalocean/godo v1.41.0 // indirect
+	github.com/docker/docker v25.0.1+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/google/pprof v0.0.0-20230821062121-407c9e7a662f // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect

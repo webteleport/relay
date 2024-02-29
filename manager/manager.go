@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btwiuse/rng"
 	"github.com/btwiuse/tags"
 	"github.com/elazarl/goproxy"
 	"github.com/elazarl/goproxy/ext/auth"
@@ -120,7 +121,7 @@ func (sm *SessionManager) Lease(ssn Session, candidates []string, clobber string
 
 	// If no candidates were specified, generate a random subdomain
 	if leaseCandidate == "" {
-		leaseCandidate = fmt.Sprintf("%d.%s", sm.counter, sm.HOST)
+		leaseCandidate = fmt.Sprintf("%s.%s", rng.NewDockerSepDigits("-", 4), sm.HOST)
 	}
 
 	// Notify the client of the leaseCandidate
