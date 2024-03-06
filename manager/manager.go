@@ -68,7 +68,7 @@ func (sm *SessionManager) DelSession(ssn Session) {
 		}
 	}
 	sm.slock.Unlock()
-	WebteleportSessionsRelayClosed.Add(1)
+	expvars.WebteleportRelaySessionsClosed.Add(1)
 }
 
 func (sm *SessionManager) Get(k string) (Session, bool) {
@@ -289,7 +289,7 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			WebteleportStreamsRelaySpawned.Add(1)
+			expvars.WebteleportRelayStreamsSpawned.Add(1)
 			return ssn.OpenConn(ctx)
 		},
 		MaxIdleConns:    100,
@@ -300,7 +300,7 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Transport: tr,
 	}
 	rp.ServeHTTP(w, r)
-	WebteleportStreamsRelayClosed.Add(1)
+	expvars.WebteleportRelayStreamsClosed.Add(1)
 }
 
 func AddManagerSession(currentSession Session, r *http.Request) {
@@ -315,7 +315,7 @@ func AddManagerSession(currentSession Session, r *http.Request) {
 	}
 	go DefaultSessionManager.Ping(currentSession)
 	go DefaultSessionManager.Scan(currentSession)
-	WebteleportSessionsRelayAccepted.Add(1)
+	expvars.WebteleportRelaySessionsAccepted.Add(1)
 }
 
 func UpgradeWebsocketSession(w http.ResponseWriter, r *http.Request) (Session, error) {
