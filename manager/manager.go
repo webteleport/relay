@@ -228,6 +228,10 @@ func Index() http.Handler {
 	return utils.WellKnownHealthMiddleware(handler)
 }
 
+func leadingComponent(s string) string {
+	return strings.Split(strings.TrimPrefix(s, "/"), "/")[0]
+}
+
 func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/debug/vars":
@@ -236,7 +240,40 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		fallthrough
 		// sm.ApiSessionsHandler(w, r)
 	default:
-		Index().ServeHTTP(w, r)
+		rpath := leadingComponent(r.URL.Path)
+		rhost := fmt.Sprintf("%s.%s", rpath, sm.HOST)
+		ssn, ok := sm.Get(rhost)
+		if !ok {
+			Index().ServeHTTP(w, r)
+			return
+		}
+
+		sm.IncrementVisit(rhost)
+
+		dr := func(req *http.Request) {
+			// log.Println("director: rewriting Host", r.URL, rhost)
+			req.Host = rhost
+			req.URL.Host = rhost
+			req.URL.Scheme = "http"
+			// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
+			// However, reverseproxy doesn't support webtransport yet
+			// so setting this field currently doesn't have any effect
+			req.Proto = r.Proto
+		}
+		tr := &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				expvars.WebteleportRelayStreamsSpawned.Add(1)
+				return ssn.OpenConn(ctx)
+			},
+			MaxIdleConns:    100,
+			IdleConnTimeout: 90 * time.Second,
+		}
+		rp := &httputil.ReverseProxy{
+			Director:  dr,
+			Transport: tr,
+		}
+		http.StripPrefix("/"+rpath, rp).ServeHTTP(w, r)
+		expvars.WebteleportRelayStreamsClosed.Add(1)
 	}
 }
 
