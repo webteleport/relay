@@ -15,9 +15,9 @@ require (
 	github.com/libdns/digitalocean v0.0.0-20230728223659-4f9064657aea
 	github.com/quic-go/quic-go v0.41.0
 	github.com/quic-go/webtransport-go v0.6.0
-	github.com/webteleport/utils v0.2.8
+	github.com/webteleport/utils v0.2.9
 	github.com/webteleport/webteleport v0.4.2
-	golang.org/x/net v0.21.0
+	golang.org/x/net v0.22.0
 	k0s.io/pkg/wrap v0.1.15
 )
 
@@ -45,13 +45,13 @@ require (
 	go.uber.org/mock v0.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/crypto v0.19.0 // indirect
-	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a // indirect
-	golang.org/x/mod v0.14.0 // indirect
+	golang.org/x/crypto v0.21.0 // indirect
+	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225 // indirect
+	golang.org/x/mod v0.15.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
-	golang.org/x/sys v0.17.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/tools v0.17.0 // indirect
+	golang.org/x/tools v0.18.0 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	k0s.io v0.1.15 // indirect

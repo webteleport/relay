@@ -99,7 +99,7 @@ func canClobber(ssn Session, clobber string) bool {
 	return clobber != "" && ssn.GetValues().Get("clobber") == clobber
 }
 
-func (sm *SessionManager) Lease(ssn Session, candidates []string, clobber string) error {
+func (sm *SessionManager) Lease(r *http.Request, ssn Session, candidates []string, clobber string) error {
 	allowRandom := len(candidates) == 0
 	leaseCandidate := ""
 
@@ -107,7 +107,7 @@ func (sm *SessionManager) Lease(ssn Session, candidates []string, clobber string
 	for _, pfx := range candidates {
 		k := fmt.Sprintf("%s.%s", pfx, sm.HOST)
 		if ssn, exist := sm.Get(k); !exist || canClobber(ssn, clobber) {
-			leaseCandidate = k
+			leaseCandidate = pfx
 			break
 		}
 	}
@@ -121,16 +121,26 @@ func (sm *SessionManager) Lease(ssn Session, candidates []string, clobber string
 
 	// If no candidates were specified, generate a random subdomain
 	if leaseCandidate == "" {
-		leaseCandidate = fmt.Sprintf("%s.%s", rng.NewDockerSepDigits("-", 4), sm.HOST)
+		leaseCandidate = rng.NewDockerSepDigits("-", 4)
+	}
+
+	hostname := fmt.Sprintf("%s.%s", leaseCandidate, sm.HOST)
+	hostnamePath := fmt.Sprintf("%s/%s/", sm.HOST, leaseCandidate)
+	println(hostname)
+	println(hostnamePath)
+
+	reply := fmt.Sprintf("HOST %s\n", hostname)
+	if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/" {
+		reply = fmt.Sprintf("HOST %s\n", hostnamePath)
 	}
 
 	// Notify the client of the leaseCandidate
-	if _, err := io.WriteString(ssn.GetController(), fmt.Sprintf("HOST %s\n", leaseCandidate)); err != nil {
+	if _, err := io.WriteString(ssn.GetController(), reply); err != nil {
 		return err
 	}
 
 	// Add the leaseCandidate to the session manager
-	if err := sm.Add(leaseCandidate, ssn); err != nil {
+	if err := sm.Add(hostname, ssn); err != nil {
 		return err
 	}
 
@@ -346,7 +356,7 @@ func AddManagerSession(currentSession Session, r *http.Request) {
 		clobber    = r.URL.Query().Get("clobber")
 	)
 
-	if err := DefaultSessionManager.Lease(currentSession, candidates, clobber); err != nil {
+	if err := DefaultSessionManager.Lease(r, currentSession, candidates, clobber); err != nil {
 		slog.Warn(fmt.Sprintf("leasing failed: %s", err))
 		return
 	}
