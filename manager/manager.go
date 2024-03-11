@@ -262,8 +262,8 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 
 		dr := func(req *http.Request) {
 			// log.Println("director: rewriting Host", r.URL, rhost)
-			req.Host = rhost
-			req.URL.Host = rhost
+			// req.Host = rhost
+			req.URL.Host = req.Host
 			req.URL.Scheme = "http"
 			// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
 			// However, reverseproxy doesn't support webtransport yet
@@ -327,7 +327,7 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dr := func(req *http.Request) {
 		// log.Println("director: rewriting Host", r.URL, r.Host)
 		req.Host = r.Host
-		req.URL.Host = r.Host
+		req.URL.Host = req.Host
 		req.URL.Scheme = "http"
 		// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
 		// However, reverseproxy doesn't support webtransport yet
