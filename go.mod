@@ -16,7 +16,7 @@ require (
 	github.com/quic-go/quic-go v0.41.0
 	github.com/quic-go/webtransport-go v0.6.0
 	github.com/webteleport/utils v0.2.9
-	github.com/webteleport/webteleport v0.4.2
+	github.com/webteleport/webteleport v0.4.3
 	golang.org/x/net v0.22.0
 	k0s.io/pkg/wrap v0.1.15
 )
@@ -55,6 +55,6 @@ require (
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	k0s.io v0.1.15 // indirect
-	k0s.io/pkg/dial v0.1.12 // indirect
+	k0s.io/pkg/dial v0.1.15 // indirect
 	nhooyr.io/websocket v1.8.10 // indirect
 )
