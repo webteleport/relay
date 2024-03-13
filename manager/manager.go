@@ -328,6 +328,12 @@ func (sm *SessionManager) IncrementVisit(k string) {
 }
 
 func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	isProxy := r.Header.Get("Proxy-Connection") != "" || r.Header.Get("Proxy-Authorization") != ""
+	if isProxy && os.Getenv("CONNECT") != "" {
+		sm.ConnectHandler(w, r)
+		return
+	}
+
 	if IsWebsocketUpgrade(r) {
 		currentSession, err := UpgradeWebsocketSession(w, r)
 		if err != nil {
@@ -348,10 +354,6 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ssn, ok := sm.Get(r.Host)
 	if !ok {
-		if r.Method == http.MethodConnect && os.Getenv("CONNECT") != "" {
-			sm.ConnectHandler(w, r)
-			return
-		}
 		utils.HostNotFoundHandler().ServeHTTP(w, r)
 		return
 	}
