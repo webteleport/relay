@@ -214,7 +214,7 @@ func (sm *SessionManager) ConnectHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	proxy := goproxy.NewProxyHttpServer()
-	proxy.Verbose = false
+	proxy.Verbose = os.Getenv("CONNECT_VERBOSE") != ""
 
 	// Create a BasicAuth middleware with the provided credentials
 	basic := auth.BasicConnect(
