@@ -282,7 +282,7 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if apisess := os.Getenv("API_SESSIONS_PATH"); dbgvars != "" && r.URL.Path == apisess {
+	if apisess := os.Getenv("API_SESSIONS_PATH"); apisess != "" && r.URL.Path == apisess {
 		sm.ApiSessionsHandler(w, r)
 		return
 	}
