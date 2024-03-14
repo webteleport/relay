@@ -19,8 +19,6 @@ import (
 
 	"github.com/btwiuse/rng"
 	"github.com/btwiuse/tags"
-	"github.com/elazarl/goproxy"
-	"github.com/elazarl/goproxy/ext/auth"
 	"github.com/hashicorp/yamux"
 	"github.com/webteleport/relay/session"
 	"github.com/webteleport/utils"
@@ -45,6 +43,7 @@ var DefaultSessionManager = &SessionManager{
 	ssnstamp: map[string]time.Time{},
 	ssn_cntr: map[string]int{},
 	slock:    &sync.RWMutex{},
+	proxy:    NewProxyHandler(),
 }
 
 type SessionManager struct {
@@ -54,6 +53,7 @@ type SessionManager struct {
 	ssnstamp map[string]time.Time
 	ssn_cntr map[string]int
 	slock    *sync.RWMutex
+	proxy    http.Handler
 }
 
 func (sm *SessionManager) DelSession(ssn Session) {
@@ -177,58 +177,58 @@ func (sm *SessionManager) Scan(ssn Session) {
 }
 
 func (sm *SessionManager) ConnectHandler(w http.ResponseWriter, r *http.Request) {
-	if os.Getenv("NAIVE") != "" {
-		rhost, _, _ := ProxyBasicAuth(r)
-		ssn, ok := sm.Get(rhost)
-		if !ok {
-			Index().ServeHTTP(w, r)
-			return
-		}
-
-		sm.IncrementVisit(rhost)
-
-		dr := func(req *http.Request) {
-			// log.Println("director: rewriting Host", r.URL, rhost)
-			// req.Host = rhost
-			req.URL.Host = req.Host
-			req.URL.Scheme = "http"
-			// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
-			// However, reverseproxy doesn't support webtransport yet
-			// so setting this field currently doesn't have any effect
-			req.Proto = r.Proto
-		}
-		tr := &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				expvars.WebteleportRelayStreamsSpawned.Add(1)
-				return ssn.OpenConn(ctx)
-			},
-			MaxIdleConns:    100,
-			IdleConnTimeout: 90 * time.Second,
-		}
-		rp := &httputil.ReverseProxy{
-			Director:  dr,
-			Transport: tr,
-		}
-		rp.ServeHTTP(w, r)
-		expvars.WebteleportRelayStreamsClosed.Add(1)
+	if os.Getenv("NAIVE") == "" || r.Header.Get("Naive") == "" {
+		sm.proxy.ServeHTTP(w, r)
 		return
 	}
-	proxy := goproxy.NewProxyHttpServer()
-	proxy.Verbose = os.Getenv("CONNECT_VERBOSE") != ""
 
-	// Create a BasicAuth middleware with the provided credentials
-	basic := auth.BasicConnect(
-		"Restricted",
-		func(user, pass string) bool {
-			ok := user != "" && pass != ""
-			return ok
+	rhost, pw, okk := ProxyBasicAuth(r)
+	ssn, ok := sm.Get(rhost)
+	if !ok {
+		slog.Warn(fmt.Sprintln("Proxy agent not found:", rhost, pw, okk))
+		Index().ServeHTTP(w, r)
+		return
+	}
+
+	sm.IncrementVisit(rhost)
+
+	if r.Header.Get("Host") == "" {
+		r.Header.Set("Host", r.URL.Host)
+	}
+
+	proxyConnection := r.Header.Get("Proxy-Connection")
+	proxyAuthorization := r.Header.Get("Proxy-Authorization")
+
+	rw := func(req *httputil.ProxyRequest) {
+		req.SetXForwarded()
+
+		req.Out.URL.Host = r.Host
+		// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
+		// However, reverseproxy doesn't support webtransport yet
+		// so setting this field currently doesn't have any effect
+		req.Out.URL.Scheme = "http"
+		req.Out.Header.Set("Proxy-Connection", proxyConnection)
+		req.Out.Header.Set("Proxy-Authorization", proxyAuthorization)
+	}
+	tr := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			expvars.WebteleportRelayStreamsSpawned.Add(1)
+			return ssn.OpenConn(ctx)
 		},
-	)
-
-	// Use the BasicAuth middleware with the proxy server
-	proxy.OnRequest().HandleConnect(basic)
-
-	proxy.ServeHTTP(w, r)
+		MaxIdleConns:    100,
+		IdleConnTimeout: 90 * time.Second,
+		DisableCompression: true,
+	}
+	rp := &httputil.ReverseProxy{
+		Rewrite: rw,
+		Transport: tr,
+	}
+	println("proxy::open")
+	// TODO: proxy request will stuck here
+	// so for now this feature is not working
+	rp.ServeHTTP(w, r)
+	println("proxy::returned")
+	expvars.WebteleportRelayStreamsClosed.Add(1)
 }
 
 type Record struct {
@@ -294,15 +294,12 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 
 		sm.IncrementVisit(rhost)
 
-		dr := func(req *http.Request) {
-			// log.Println("director: rewriting Host", r.URL, rhost)
-			// req.Host = rhost
-			req.URL.Host = req.Host
-			req.URL.Scheme = "http"
+		rw := func(req *httputil.ProxyRequest) {
+			req.Out.URL.Host = r.Host
 			// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
 			// However, reverseproxy doesn't support webtransport yet
 			// so setting this field currently doesn't have any effect
-			req.Proto = r.Proto
+			req.Out.URL.Scheme = "http"
 		}
 		tr := &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -313,7 +310,7 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 			IdleConnTimeout: 90 * time.Second,
 		}
 		rp := &httputil.ReverseProxy{
-			Director:  dr,
+			Rewrite:  rw,
 			Transport: tr,
 		}
 		http.StripPrefix("/"+rpath, rp).ServeHTTP(w, r)
@@ -360,15 +357,12 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	sm.IncrementVisit(r.Host)
 
-	dr := func(req *http.Request) {
-		// log.Println("director: rewriting Host", r.URL, r.Host)
-		req.Host = r.Host
-		req.URL.Host = req.Host
-		req.URL.Scheme = "http"
+	rw := func(req *httputil.ProxyRequest) {
+		req.Out.URL.Host = r.Host
 		// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
 		// However, reverseproxy doesn't support webtransport yet
 		// so setting this field currently doesn't have any effect
-		req.Proto = r.Proto
+		req.Out.URL.Scheme = "http"
 	}
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -379,7 +373,7 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		IdleConnTimeout: 90 * time.Second,
 	}
 	rp := &httputil.ReverseProxy{
-		Director:  dr,
+		Rewrite:  rw,
 		Transport: tr,
 	}
 	rp.ServeHTTP(w, r)
