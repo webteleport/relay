@@ -215,12 +215,12 @@ func (sm *SessionManager) ConnectHandler(w http.ResponseWriter, r *http.Request)
 			expvars.WebteleportRelayStreamsSpawned.Add(1)
 			return ssn.OpenConn(ctx)
 		},
-		MaxIdleConns:    100,
-		IdleConnTimeout: 90 * time.Second,
+		MaxIdleConns:       100,
+		IdleConnTimeout:    90 * time.Second,
 		DisableCompression: true,
 	}
 	rp := &httputil.ReverseProxy{
-		Rewrite: rw,
+		Rewrite:   rw,
 		Transport: tr,
 	}
 	println("proxy::open")
@@ -277,45 +277,47 @@ func leadingComponent(s string) string {
 }
 
 func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.URL.Path {
-	case "/debug/vars":
+	if dbgvars := os.Getenv("DEBUG_VARS_PATH"); dbgvars != "" && r.URL.Path == dbgvars {
 		expvar.Handler().ServeHTTP(w, r)
-	case "/api/sessions":
-		fallthrough
-		// sm.ApiSessionsHandler(w, r)
-	default:
-		rpath := leadingComponent(r.URL.Path)
-		rhost := fmt.Sprintf("%s.%s", rpath, sm.HOST)
-		ssn, ok := sm.Get(rhost)
-		if !ok {
-			Index().ServeHTTP(w, r)
-			return
-		}
-
-		sm.IncrementVisit(rhost)
-
-		rw := func(req *httputil.ProxyRequest) {
-			req.Out.URL.Host = r.Host
-			// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
-			// However, reverseproxy doesn't support webtransport yet
-			// so setting this field currently doesn't have any effect
-			req.Out.URL.Scheme = "http"
-		}
-		tr := &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				expvars.WebteleportRelayStreamsSpawned.Add(1)
-				return ssn.OpenConn(ctx)
-			},
-			MaxIdleConns:    100,
-			IdleConnTimeout: 90 * time.Second,
-		}
-		rp := &httputil.ReverseProxy{
-			Rewrite:  rw,
-			Transport: tr,
-		}
-		http.StripPrefix("/"+rpath, rp).ServeHTTP(w, r)
-		expvars.WebteleportRelayStreamsClosed.Add(1)
+		return
 	}
+
+	if apisess := os.Getenv("API_SESSIONS_PATH"); dbgvars != "" && r.URL.Path == apisess {
+		sm.ApiSessionsHandler(w, r)
+		return
+	}
+
+	rpath := leadingComponent(r.URL.Path)
+	rhost := fmt.Sprintf("%s.%s", rpath, sm.HOST)
+	ssn, ok := sm.Get(rhost)
+	if !ok {
+		Index().ServeHTTP(w, r)
+		return
+	}
+
+	sm.IncrementVisit(rhost)
+
+	rw := func(req *httputil.ProxyRequest) {
+		req.Out.URL.Host = r.Host
+		// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
+		// However, reverseproxy doesn't support webtransport yet
+		// so setting this field currently doesn't have any effect
+		req.Out.URL.Scheme = "http"
+	}
+	tr := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			expvars.WebteleportRelayStreamsSpawned.Add(1)
+			return ssn.OpenConn(ctx)
+		},
+		MaxIdleConns:    100,
+		IdleConnTimeout: 90 * time.Second,
+	}
+	rp := &httputil.ReverseProxy{
+		Rewrite:   rw,
+		Transport: tr,
+	}
+	http.StripPrefix("/"+rpath, rp).ServeHTTP(w, r)
+	expvars.WebteleportRelayStreamsClosed.Add(1)
 }
 
 func (sm *SessionManager) IncrementVisit(k string) {
@@ -373,7 +375,7 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		IdleConnTimeout: 90 * time.Second,
 	}
 	rp := &httputil.ReverseProxy{
-		Rewrite:  rw,
+		Rewrite:   rw,
 		Transport: tr,
 	}
 	rp.ServeHTTP(w, r)
