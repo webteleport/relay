@@ -298,6 +298,8 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	sm.IncrementVisit(rhost)
 
 	rw := func(req *httputil.ProxyRequest) {
+		req.SetXForwarded()
+
 		req.Out.URL.Host = r.Host
 		// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
 		// However, reverseproxy doesn't support webtransport yet
@@ -360,6 +362,8 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sm.IncrementVisit(r.Host)
 
 	rw := func(req *httputil.ProxyRequest) {
+		req.SetXForwarded()
+
 		req.Out.URL.Host = r.Host
 		// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
 		// However, reverseproxy doesn't support webtransport yet
