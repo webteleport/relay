@@ -15,8 +15,8 @@ require (
 	github.com/libdns/digitalocean v0.0.0-20230728223659-4f9064657aea
 	github.com/quic-go/quic-go v0.41.0
 	github.com/quic-go/webtransport-go v0.6.0
-	github.com/webteleport/utils v0.2.9
-	github.com/webteleport/webteleport v0.4.3
+	github.com/webteleport/utils v0.2.10
+	github.com/webteleport/webteleport v0.4.4
 	golang.org/x/net v0.22.0
 	k0s.io/pkg/wrap v0.1.15
 )
