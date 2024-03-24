@@ -7,16 +7,16 @@ go 1.22.1
 
 require (
 	github.com/btwiuse/rng v0.0.0
-	github.com/btwiuse/tags v0.0.0
+	github.com/btwiuse/tags v0.0.2
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/elazarl/goproxy v0.0.0-20231117061959-7cc037d33fb5
 	github.com/elazarl/goproxy/ext v0.0.0-20231117061959-7cc037d33fb5
 	github.com/hashicorp/yamux v0.1.1
 	github.com/libdns/digitalocean v0.0.0-20230728223659-4f9064657aea
-	github.com/quic-go/quic-go v0.41.0
-	github.com/quic-go/webtransport-go v0.6.0
+	github.com/quic-go/quic-go v0.42.0
+	github.com/quic-go/webtransport-go v0.7.0
 	github.com/webteleport/utils v0.2.10
-	github.com/webteleport/webteleport v0.4.4
+	github.com/webteleport/webteleport v0.4.6
 	golang.org/x/net v0.22.0
 	k0s.io/pkg/wrap v0.1.15
 )
@@ -42,7 +42,7 @@ require (
 	github.com/rs/cors v1.10.1 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	go.uber.org/mock v0.3.0 // indirect
+	go.uber.org/mock v0.4.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/crypto v0.21.0 // indirect
@@ -53,7 +53,7 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.18.0 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
-	google.golang.org/protobuf v1.28.0 // indirect
+	google.golang.org/protobuf v1.31.0 // indirect
 	k0s.io v0.1.15 // indirect
 	k0s.io/pkg/dial v0.1.15 // indirect
 	nhooyr.io/websocket v1.8.10 // indirect
