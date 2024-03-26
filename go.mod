@@ -8,6 +8,7 @@ go 1.22.1
 require (
 	github.com/btwiuse/rng v0.0.0
 	github.com/btwiuse/tags v0.0.2
+	github.com/btwiuse/wsconn v0.0.1
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/elazarl/goproxy v0.0.0-20231117061959-7cc037d33fb5
 	github.com/elazarl/goproxy/ext v0.0.0-20231117061959-7cc037d33fb5
@@ -16,9 +17,8 @@ require (
 	github.com/quic-go/quic-go v0.42.0
 	github.com/quic-go/webtransport-go v0.7.0
 	github.com/webteleport/utils v0.2.10
-	github.com/webteleport/webteleport v0.4.6
+	github.com/webteleport/webteleport v0.5.0
 	golang.org/x/net v0.22.0
-	k0s.io/pkg/wrap v0.1.15
 )
 
 require (
@@ -54,7 +54,5 @@ require (
 	golang.org/x/tools v0.18.0 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
-	k0s.io v0.1.15 // indirect
-	k0s.io/pkg/dial v0.1.15 // indirect
 	nhooyr.io/websocket v1.8.10 // indirect
 )

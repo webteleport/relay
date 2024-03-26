@@ -19,11 +19,13 @@ import (
 
 	"github.com/btwiuse/rng"
 	"github.com/btwiuse/tags"
+	"github.com/btwiuse/wsconn"
 	"github.com/hashicorp/yamux"
 	"github.com/webteleport/relay/session"
 	"github.com/webteleport/utils"
+	"github.com/webteleport/webteleport/transport"
+	"github.com/webteleport/webteleport/transport/websocket"
 	"golang.org/x/net/idna"
-	"k0s.io/pkg/wrap"
 )
 
 var _ Session = (*session.WebsocketSession)(nil)
@@ -50,6 +52,7 @@ type SessionManager struct {
 	HOST     string
 	counter  int
 	sessions map[string]Session
+	// ssnctrls map[string]net.Conn
 	ssnstamp map[string]time.Time
 	ssn_cntr map[string]int
 	slock    *sync.RWMutex
@@ -402,7 +405,7 @@ func AddManagerSession(currentSession Session, r *http.Request) {
 }
 
 func UpgradeWebsocketSession(w http.ResponseWriter, r *http.Request) (Session, error) {
-	conn, err := wrap.Wrconn(w, r)
+	conn, err := wsconn.Wrconn(w, r)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
 		w.WriteHeader(500)
@@ -414,6 +417,8 @@ func UpgradeWebsocketSession(w http.ResponseWriter, r *http.Request) (Session, e
 		w.WriteHeader(500)
 		return nil, err
 	}
+	var tssn transport.Session = &websocket.WebsocketSession{ssn}
+	_ = tssn
 	managerSession := &session.WebsocketSession{
 		Session: ssn,
 		Values:  r.URL.Query(),
