@@ -47,19 +47,17 @@ func init() {
 	getCertificatesOnDemand()
 }
 
-func New(host, port string, next http.Handler, tlsConfig *tls.Config) *Relay {
-	sessionManager := NewSessionManager(host)
-	s := &webtransportGo.Server{
-		CheckOrigin: func(*http.Request) bool { return true },
-	}
+func New(host, port string, tlsConfig *tls.Config) *Relay {
+	sm := NewSessionManager(host)
 	r := &Relay{
-		Server:         s,
-		SessionManager: sessionManager,
-		Next:           next,
+		WTServer: &webtransportGo.Server{
+			CheckOrigin: func(*http.Request) bool { return true },
+		},
+		SessionManager: sm,
 	}
-	s.H3 = http3.Server{
+	r.WTServer.H3 = http3.Server{
 		Addr:            port,
-		Handler:         r.UpgradeWebtransportHandler(),
+		Handler:         r,
 		EnableDatagrams: true,
 		TLSConfig:       tlsConfig,
 	}
@@ -67,7 +65,7 @@ func New(host, port string, next http.Handler, tlsConfig *tls.Config) *Relay {
 }
 
 type Relay struct {
-	*webtransportGo.Server
+	WTServer       *webtransportGo.Server
 	SessionManager *SessionManager
 	Next           http.Handler
 }
@@ -76,26 +74,31 @@ func IsWebtransportUpgrade(r *http.Request) (result bool) {
 	return r.URL.Query().Get("x-webtransport-upgrade") != ""
 }
 
-func (s *Relay) UpgradeWebtransportHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !IsWebtransportUpgrade(r) {
+type WebtransportUpgraderFunc func(http.ResponseWriter, *http.Request) (*webtransportGo.Session, error)
+
+func (s *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if !IsWebtransportUpgrade(r) {
+		if s.Next != nil {
 			s.Next.ServeHTTP(w, r)
+		} else {
+			s.SessionManager.ServeHTTP(w, r)
 		}
+		return
+	}
 
-		ssn, err := s.Upgrade(w, r)
-		if err != nil {
-			slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
-			w.WriteHeader(500)
-			return
-		}
+	ssn, err := s.WTServer.Upgrade(w, r)
+	if err != nil {
+		slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
+		w.WriteHeader(500)
+		return
+	}
 
-		tssn := &webtransport.WebtransportSession{ssn}
-		tstm, err := tssn.OpenStream(context.Background())
-		if err != nil {
-			slog.Warn(fmt.Sprintf("stm0 init failed: %s", err))
-			return
-		}
+	tssn := &webtransport.WebtransportSession{ssn}
+	tstm, err := tssn.OpenStream(context.Background())
+	if err != nil {
+		slog.Warn(fmt.Sprintf("stm0 init failed: %s", err))
+		return
+	}
 
-		s.SessionManager.AddSession(r, tssn, tstm)
-	})
+	s.SessionManager.AddSession(r, tssn, tstm)
 }
