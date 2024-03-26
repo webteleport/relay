@@ -1,4 +1,4 @@
-package manager
+package relay
 
 import (
 	"bufio"
@@ -21,49 +21,42 @@ import (
 	"github.com/btwiuse/tags"
 	"github.com/btwiuse/wsconn"
 	"github.com/hashicorp/yamux"
-	"github.com/webteleport/relay/session"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/transport"
 	"github.com/webteleport/webteleport/transport/websocket"
 	"golang.org/x/net/idna"
 )
 
-var _ Session = (*session.WebsocketSession)(nil)
-var _ Session = (*session.WebtransportSession)(nil)
-
-type Session interface {
-	InitController(context.Context) error
-	GetController() net.Conn
-	GetValues() url.Values
-	OpenConn(context.Context) (net.Conn, error)
-}
-
-var DefaultSessionManager = &SessionManager{
-	HOST:     "<unknown>",
-	counter:  0,
-	sessions: map[string]Session{},
-	ssnstamp: map[string]time.Time{},
-	ssn_cntr: map[string]int{},
-	slock:    &sync.RWMutex{},
-	proxy:    NewProxyHandler(),
+func NewSessionManager(host string) *SessionManager {
+	return &SessionManager{
+		HOST:     host,
+		counter:  0,
+		sessions: map[string]transport.Session{},
+		values:   map[string]url.Values{},
+		ssnstamp: map[string]time.Time{},
+		ssn_cntr: map[string]int{},
+		slock:    &sync.RWMutex{},
+		proxy:    NewProxyHandler(),
+	}
 }
 
 type SessionManager struct {
 	HOST     string
 	counter  int
-	sessions map[string]Session
-	// ssnctrls map[string]net.Conn
+	sessions map[string]transport.Session
+	values   map[string]url.Values
 	ssnstamp map[string]time.Time
 	ssn_cntr map[string]int
 	slock    *sync.RWMutex
 	proxy    http.Handler
 }
 
-func (sm *SessionManager) DelSession(ssn Session) {
+func (sm *SessionManager) DelSession(ssn transport.Session) {
 	sm.slock.Lock()
 	for k, v := range sm.sessions {
 		if v == ssn {
 			delete(sm.sessions, k)
+			delete(sm.values, k)
 			delete(sm.ssnstamp, k)
 			delete(sm.ssn_cntr, k)
 			emsg := fmt.Sprintf("Recycled %s", k)
@@ -74,7 +67,7 @@ func (sm *SessionManager) DelSession(ssn Session) {
 	expvars.WebteleportRelaySessionsClosed.Add(1)
 }
 
-func (sm *SessionManager) Get(k string) (Session, bool) {
+func (sm *SessionManager) Get(k string) (transport.Session, bool) {
 	k, _ = idna.ToASCII(k)
 	host, _, _ := strings.Cut(k, ":")
 	sm.slock.RLock()
@@ -83,33 +76,36 @@ func (sm *SessionManager) Get(k string) (Session, bool) {
 	return ssn, ok
 }
 
-func (sm *SessionManager) Add(k string, ssn Session) error {
+func (sm *SessionManager) Add(k string, tssn transport.Session, vals url.Values) error {
 	k, err := idna.ToASCII(k)
 	if err != nil {
 		return err
 	}
 	sm.slock.Lock()
 	sm.counter += 1
-	sm.sessions[k] = ssn
+	sm.sessions[k] = tssn
+	sm.values[k] = vals
 	sm.ssnstamp[k] = time.Now()
 	sm.ssn_cntr[k] = 0
 	sm.slock.Unlock()
 	return nil
 }
 
-// canClobber checks if the clobber string matches the session's clobber value
-func canClobber(ssn Session, clobber string) bool {
-	return clobber != "" && ssn.GetValues().Get("clobber") == clobber
-}
+func (sm *SessionManager) Lease(r *http.Request, tssn transport.Session, tstm transport.Stream) error {
+	var (
+		candidates = utils.ParseDomainCandidates(r.URL.Path)
+		values     = r.URL.Query()
+		clobber    = values.Get("clobber")
+		canClobber = clobber != "" && values.Get("clobber") == clobber
+	)
 
-func (sm *SessionManager) Lease(r *http.Request, ssn Session, candidates []string, clobber string) error {
 	allowRandom := len(candidates) == 0
 	leaseCandidate := ""
 
 	// Try to lease the first available subdomain if candidates are provided
 	for _, pfx := range candidates {
 		k := fmt.Sprintf("%s.%s", pfx, sm.HOST)
-		if ssn, exist := sm.Get(k); !exist || canClobber(ssn, clobber) {
+		if _, exist := sm.Get(k); !exist || canClobber {
 			leaseCandidate = pfx
 			break
 		}
@@ -118,7 +114,7 @@ func (sm *SessionManager) Lease(r *http.Request, ssn Session, candidates []strin
 	// If no specified candidates are available and random is not allowed, return with an error
 	if leaseCandidate == "" && !allowRandom {
 		emsg := fmt.Sprintf("ERR %s: %v\n", "none of your requested subdomains are currently available", candidates)
-		_, err := io.WriteString(ssn.GetController(), emsg)
+		_, err := io.WriteString(tstm, emsg)
 		return err
 	}
 
@@ -136,12 +132,12 @@ func (sm *SessionManager) Lease(r *http.Request, ssn Session, candidates []strin
 	}
 
 	// Notify the client of the leaseCandidate
-	if _, err := io.WriteString(ssn.GetController(), reply); err != nil {
+	if _, err := io.WriteString(tstm, reply); err != nil {
 		return err
 	}
 
 	// Add the leaseCandidate to the session manager
-	if err := sm.Add(hostname, ssn); err != nil {
+	if err := sm.Add(hostname, tssn, values); err != nil {
 		return err
 	}
 
@@ -150,19 +146,19 @@ func (sm *SessionManager) Lease(r *http.Request, ssn Session, candidates []strin
 
 var PingInterval = 5 * time.Second
 
-func (sm *SessionManager) Ping(ssn Session) {
+func (sm *SessionManager) Ping(tssn transport.Session, tstm transport.Stream) {
 	for {
 		time.Sleep(PingInterval)
-		_, err := io.WriteString(ssn.GetController(), fmt.Sprintf("%s\n", "PING"))
+		_, err := io.WriteString(tstm, fmt.Sprintf("%s\n", "PING"))
 		if err != nil {
 			break
 		}
 	}
-	sm.DelSession(ssn)
+	sm.DelSession(tssn)
 }
 
-func (sm *SessionManager) Scan(ssn Session) {
-	scanner := bufio.NewScanner(ssn.GetController())
+func (sm *SessionManager) Scan(tssn transport.Session, tstm transport.Stream) {
+	scanner := bufio.NewScanner(tstm)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "PONG" {
@@ -172,7 +168,7 @@ func (sm *SessionManager) Scan(ssn Session) {
 		}
 		if line == "CLOSE" {
 			// close session immediately
-			sm.DelSession(ssn)
+			sm.DelSession(tssn)
 			break
 		}
 		slog.Warn(fmt.Sprintf("stm0: unknown command: %s", line))
@@ -186,7 +182,7 @@ func (sm *SessionManager) ConnectHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	rhost, pw, okk := ProxyBasicAuth(r)
-	ssn, ok := sm.Get(rhost)
+	tssn, ok := sm.Get(rhost)
 	if !ok {
 		slog.Warn(fmt.Sprintln("Proxy agent not found:", rhost, pw, okk))
 		Index().ServeHTTP(w, r)
@@ -216,7 +212,8 @@ func (sm *SessionManager) ConnectHandler(w http.ResponseWriter, r *http.Request)
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			expvars.WebteleportRelayStreamsSpawned.Add(1)
-			return ssn.OpenConn(ctx)
+			stm, err := tssn.OpenStream(ctx)
+			return stm, err
 		},
 		MaxIdleConns:       100,
 		IdleConnTimeout:    90 * time.Second,
@@ -246,7 +243,7 @@ func (sm *SessionManager) ApiSessionsHandler(w http.ResponseWriter, r *http.Requ
 	all := []Record{}
 	for host := range sm.sessions {
 		since := sm.ssnstamp[host]
-		tags := tags.Tags{Values: sm.sessions[host].GetValues()}
+		tags := tags.Tags{Values: sm.values[host]}
 		visited := sm.ssn_cntr[host]
 		record := Record{
 			Host:      host,
@@ -292,7 +289,7 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 
 	rpath := leadingComponent(r.URL.Path)
 	rhost := fmt.Sprintf("%s.%s", rpath, sm.HOST)
-	ssn, ok := sm.Get(rhost)
+	tssn, ok := sm.Get(rhost)
 	if !ok {
 		Index().ServeHTTP(w, r)
 		return
@@ -312,7 +309,8 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			expvars.WebteleportRelayStreamsSpawned.Add(1)
-			return ssn.OpenConn(ctx)
+			stm, err := tssn.OpenStream(ctx)
+			return stm, err
 		},
 		MaxIdleConns:    100,
 		IdleConnTimeout: 90 * time.Second,
@@ -339,12 +337,12 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if IsWebsocketUpgrade(r) {
-		currentSession, err := UpgradeWebsocketSession(w, r)
+		tssn, tstm, err := UpgradeWebsocketSession(w, r)
 		if err != nil {
 			slog.Warn(fmt.Sprintf("upgrade websocket session failed: %s", err))
 			return
 		}
-		AddManagerSession(currentSession, r)
+		sm.AddSession(r, tssn, tstm)
 		return
 	}
 	// for HTTP_PROXY r.Method = GET && r.Host = google.com
@@ -356,7 +354,7 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ssn, ok := sm.Get(r.Host)
+	tssn, ok := sm.Get(r.Host)
 	if !ok {
 		utils.HostNotFoundHandler().ServeHTTP(w, r)
 		return
@@ -376,7 +374,8 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			expvars.WebteleportRelayStreamsSpawned.Add(1)
-			return ssn.OpenConn(ctx)
+			stm, err := tssn.OpenStream(ctx)
+			return stm, err
 		},
 		MaxIdleConns:    100,
 		IdleConnTimeout: 90 * time.Second,
@@ -389,46 +388,36 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	expvars.WebteleportRelayStreamsClosed.Add(1)
 }
 
-func AddManagerSession(currentSession Session, r *http.Request) {
-	var (
-		candidates = utils.ParseDomainCandidates(r.URL.Path)
-		clobber    = r.URL.Query().Get("clobber")
-	)
-
-	if err := DefaultSessionManager.Lease(r, currentSession, candidates, clobber); err != nil {
+func (sm *SessionManager) AddSession(r *http.Request, tssn transport.Session, tstm transport.Stream) {
+	if err := sm.Lease(r, tssn, tstm); err != nil {
 		slog.Warn(fmt.Sprintf("leasing failed: %s", err))
 		return
 	}
-	go DefaultSessionManager.Ping(currentSession)
-	go DefaultSessionManager.Scan(currentSession)
+	go sm.Ping(tssn, tstm)
+	go sm.Scan(tssn, tstm)
 	expvars.WebteleportRelaySessionsAccepted.Add(1)
 }
 
-func UpgradeWebsocketSession(w http.ResponseWriter, r *http.Request) (Session, error) {
+func UpgradeWebsocketSession(w http.ResponseWriter, r *http.Request) (tssn transport.Session, tstm transport.Stream, err error) {
 	conn, err := wsconn.Wrconn(w, r)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
 		w.WriteHeader(500)
-		return nil, err
+		return
 	}
 	ssn, err := yamux.Server(conn, nil)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("creating yamux.Server failed: %s", err))
 		w.WriteHeader(500)
-		return nil, err
+		return
 	}
-	var tssn transport.Session = &websocket.WebsocketSession{ssn}
-	_ = tssn
-	managerSession := &session.WebsocketSession{
-		Session: ssn,
-		Values:  r.URL.Query(),
-	}
-	err = managerSession.InitController(context.Background())
+	tssn = &websocket.WebsocketSession{ssn}
+	tstm, err = tssn.OpenStream(context.Background())
 	if err != nil {
-		slog.Warn(fmt.Sprintf("session init failed: %s", err))
-		return nil, err
+		slog.Warn(fmt.Sprintf("stm0 init failed: %s", err))
+		return
 	}
-	return managerSession, nil
+	return
 }
 
 func IsWebsocketUpgrade(r *http.Request) (result bool) {

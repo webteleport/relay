@@ -12,9 +12,6 @@ import (
 	"github.com/libdns/digitalocean"
 	"github.com/quic-go/quic-go/http3"
 	webtransportGo "github.com/quic-go/webtransport-go"
-	"github.com/webteleport/relay/manager"
-	"github.com/webteleport/relay/session"
-	"github.com/webteleport/webteleport/transport"
 	"github.com/webteleport/webteleport/transport/webtransport"
 )
 
@@ -51,14 +48,14 @@ func init() {
 }
 
 func New(host, port string, next http.Handler, tlsConfig *tls.Config) *Relay {
-	manager.DefaultSessionManager.HOST = host
+	sessionManager := NewSessionManager(host)
 	s := &webtransportGo.Server{
 		CheckOrigin: func(*http.Request) bool { return true },
 	}
 	r := &Relay{
-		Server: s,
-		Next:   next,
-		HOST:   host,
+		Server:         s,
+		SessionManager: sessionManager,
+		Next:           next,
 	}
 	s.H3 = http3.Server{
 		Addr:            port,
@@ -71,8 +68,8 @@ func New(host, port string, next http.Handler, tlsConfig *tls.Config) *Relay {
 
 type Relay struct {
 	*webtransportGo.Server
-	Next http.Handler
-	HOST string
+	SessionManager *SessionManager
+	Next           http.Handler
 }
 
 func IsWebtransportUpgrade(r *http.Request) (result bool) {
@@ -91,20 +88,14 @@ func (s *Relay) UpgradeWebtransportHandler() http.Handler {
 			w.WriteHeader(500)
 			return
 		}
-		var tssn transport.Session = &webtransport.WebtransportSession{ssn}
-		_ = tssn
 
-		var currentSession manager.Session = &session.WebtransportSession{
-			Session: ssn,
-			Values:  r.URL.Query(),
-		}
-
-		err = currentSession.InitController(context.Background())
+		tssn := &webtransport.WebtransportSession{ssn}
+		tstm, err := tssn.OpenStream(context.Background())
 		if err != nil {
-			slog.Warn(fmt.Sprintf("session init failed: %s", err))
+			slog.Warn(fmt.Sprintf("stm0 init failed: %s", err))
 			return
 		}
 
-		manager.AddManagerSession(currentSession, r)
+		s.SessionManager.AddSession(r, tssn, tstm)
 	})
 }
