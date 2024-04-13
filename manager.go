@@ -336,7 +336,7 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if IsWebsocketUpgrade(r) {
+	if sm.IsWebsocketUpgrade(r) {
 		tssn, tstm, err := UpgradeWebsocketSession(w, r)
 		if err != nil {
 			slog.Warn(fmt.Sprintf("upgrade websocket session failed: %s", err))
@@ -420,6 +420,7 @@ func UpgradeWebsocketSession(w http.ResponseWriter, r *http.Request) (tssn trans
 	return
 }
 
-func IsWebsocketUpgrade(r *http.Request) (result bool) {
-	return r.URL.Query().Get("x-websocket-upgrade") != ""
+func (sm *SessionManager) IsWebsocketUpgrade(r *http.Request) (result bool) {
+	origin, _, _ := strings.Cut(r.Host, ":")
+	return r.URL.Query().Get("x-websocket-upgrade") != "" && origin == sm.HOST
 }

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/caddyserver/certmagic"
 	"github.com/libdns/digitalocean"
@@ -70,14 +71,15 @@ type Relay struct {
 	Next           http.Handler
 }
 
-func IsWebtransportUpgrade(r *http.Request) (result bool) {
-	return r.URL.Query().Get("x-webtransport-upgrade") != ""
+func (s *Relay) IsWebtransportUpgrade(r *http.Request) (result bool) {
+	origin, _, _ := strings.Cut(r.Host, ":")
+	return r.URL.Query().Get("x-webtransport-upgrade") != "" && origin == s.SessionManager.HOST
 }
 
 type WebtransportUpgraderFunc func(http.ResponseWriter, *http.Request) (*webtransportGo.Session, error)
 
 func (s *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !IsWebtransportUpgrade(r) {
+	if !s.IsWebtransportUpgrade(r) {
 		if s.Next != nil {
 			s.Next.ServeHTTP(w, r)
 		} else {
