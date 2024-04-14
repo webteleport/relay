@@ -7,11 +7,13 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/btwiuse/rng"
+	"github.com/btwiuse/tags"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/transport"
 	"golang.org/x/net/idna"
@@ -37,6 +39,49 @@ type SessionStore struct {
 	ssn_cntr map[string]int
 	slock    *sync.RWMutex
 	interval time.Duration
+}
+
+type Record struct {
+	Host      string    `json:"host"`
+	CreatedAt time.Time `json:"created_at"`
+	Tags      tags.Tags `json:"tags"`
+	Visited   int       `json:"visited"`
+}
+
+func (sm *SessionStore) Records() (all []Record) {
+	for host := range sm.sessions {
+		since := sm.ssnstamp[host]
+		tags := tags.Tags{Values: sm.values[host]}
+		visited := sm.ssn_cntr[host]
+		record := Record{
+			Host:      host,
+			CreatedAt: since,
+			Tags:      tags,
+			Visited:   visited,
+		}
+		all = append(all, record)
+	}
+	sort.Slice(all, func(i, j int) bool {
+		return all[i].CreatedAt.After(all[j].CreatedAt)
+	})
+	return
+}
+
+func (sm *SessionStore) RecordsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	all := sm.Records()
+	resp, err := tags.UnescapedJSONMarshalIndent(all, "  ")
+	if err != nil {
+		slog.Warn(fmt.Sprintf("json marshal failed: %s", err))
+		return
+	}
+	w.Write(resp)
+}
+
+func (sm *SessionStore) Visited(k string) {
+	sm.slock.Lock()
+	sm.ssn_cntr[k] += 1
+	sm.slock.Unlock()
 }
 
 func (sm *SessionStore) Remove(ssn transport.Session) {

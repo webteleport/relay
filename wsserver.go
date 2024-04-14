@@ -9,11 +9,9 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
-	"github.com/btwiuse/tags"
 	"github.com/btwiuse/wsconn"
 	"github.com/hashicorp/yamux"
 	"github.com/webteleport/utils"
@@ -21,23 +19,23 @@ import (
 	"github.com/webteleport/webteleport/transport/websocket"
 )
 
-func NewWSServer(host string, store *SessionStore) *SessionManager {
-	return &SessionManager{
+func NewWSServer(host string, store Storage) *WSServer {
+	return &WSServer{
 		HOST:              host,
-		SessionStore:      store,
+		Storage:           store,
 		WebsocketUpgrader: &WebsocketUpgrader{},
 		Proxy:             NewProxyHandler(),
 	}
 }
 
-type SessionManager struct {
+type WSServer struct {
 	HOST string
-	*SessionStore
+	Storage
 	*WebsocketUpgrader
 	Proxy http.Handler
 }
 
-func (sm *SessionManager) ConnectHandler(w http.ResponseWriter, r *http.Request) {
+func (sm *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("NAIVE") == "" || r.Header.Get("Naive") == "" {
 		sm.Proxy.ServeHTTP(w, r)
 		return
@@ -47,11 +45,11 @@ func (sm *SessionManager) ConnectHandler(w http.ResponseWriter, r *http.Request)
 	tssn, ok := sm.Get(rhost)
 	if !ok {
 		slog.Warn(fmt.Sprintln("Proxy agent not found:", rhost, pw, okk))
-		Index().ServeHTTP(w, r)
+		DefaultIndex().ServeHTTP(w, r)
 		return
 	}
 
-	sm.IncrementVisit(rhost)
+	sm.Visited(rhost)
 
 	if r.Header.Get("Host") == "" {
 		r.Header.Set("Host", r.URL.Host)
@@ -93,40 +91,7 @@ func (sm *SessionManager) ConnectHandler(w http.ResponseWriter, r *http.Request)
 	expvars.WebteleportRelayStreamsClosed.Add(1)
 }
 
-type Record struct {
-	Host      string    `json:"host"`
-	CreatedAt time.Time `json:"created_at"`
-	Tags      tags.Tags `json:"tags"`
-	Visited   int       `json:"visited"`
-}
-
-func (sm *SessionManager) ApiSessionsHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	all := []Record{}
-	for host := range sm.sessions {
-		since := sm.ssnstamp[host]
-		tags := tags.Tags{Values: sm.values[host]}
-		visited := sm.ssn_cntr[host]
-		record := Record{
-			Host:      host,
-			CreatedAt: since,
-			Tags:      tags,
-			Visited:   visited,
-		}
-		all = append(all, record)
-	}
-	sort.Slice(all, func(i, j int) bool {
-		return all[i].CreatedAt.After(all[j].CreatedAt)
-	})
-	resp, err := tags.UnescapedJSONMarshalIndent(all, "  ")
-	if err != nil {
-		slog.Warn(fmt.Sprintf("json marshal failed: %s", err))
-		return
-	}
-	w.Write(resp)
-}
-
-func Index() http.Handler {
+func DefaultIndex() http.Handler {
 	handler := utils.HostNotFoundHandler()
 	if index := utils.LookupEnv("INDEX"); index != nil {
 		handler = utils.ReverseProxy(*index)
@@ -138,14 +103,14 @@ func leadingComponent(s string) string {
 	return strings.Split(strings.TrimPrefix(s, "/"), "/")[0]
 }
 
-func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
+func (sm *WSServer) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	if dbgvars := os.Getenv("DEBUG_VARS_PATH"); dbgvars != "" && r.URL.Path == dbgvars {
 		expvar.Handler().ServeHTTP(w, r)
 		return
 	}
 
 	if apisess := os.Getenv("API_SESSIONS_PATH"); apisess != "" && r.URL.Path == apisess {
-		sm.ApiSessionsHandler(w, r)
+		sm.RecordsHandler(w, r)
 		return
 	}
 
@@ -153,11 +118,11 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	rhost := fmt.Sprintf("%s.%s", rpath, sm.HOST)
 	tssn, ok := sm.Get(rhost)
 	if !ok {
-		Index().ServeHTTP(w, r)
+		DefaultIndex().ServeHTTP(w, r)
 		return
 	}
 
-	sm.IncrementVisit(rhost)
+	sm.Visited(rhost)
 
 	rw := func(req *httputil.ProxyRequest) {
 		req.SetXForwarded()
@@ -185,13 +150,7 @@ func (sm *SessionManager) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	expvars.WebteleportRelayStreamsClosed.Add(1)
 }
 
-func (sm *SessionManager) IncrementVisit(k string) {
-	sm.slock.Lock()
-	sm.ssn_cntr[k] += 1
-	sm.slock.Unlock()
-}
-
-func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (sm *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	isProxy := r.Header.Get("Proxy-Connection") != "" || r.Header.Get("Proxy-Authorization") != ""
 	if isProxy && os.Getenv("CONNECT") != "" {
 		sm.ConnectHandler(w, r)
@@ -231,7 +190,7 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sm.IncrementVisit(r.Host)
+	sm.Visited(r.Host)
 
 	rw := func(req *httputil.ProxyRequest) {
 		req.SetXForwarded()
@@ -259,6 +218,15 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	expvars.WebteleportRelayStreamsClosed.Add(1)
 }
 
+func (sm *WSServer) IsIndex(r *http.Request) (result bool) {
+	origin, _, _ := strings.Cut(r.Host, ":")
+	return origin == sm.HOST
+}
+
+func (sm *WSServer) IsUpgrade(r *http.Request) (result bool) {
+	return r.URL.Query().Get("x-websocket-upgrade") != "" && sm.IsIndex(r)
+}
+
 type WebsocketUpgrader struct{}
 
 func (*WebsocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (tssn transport.Session, tstm transport.Stream, err error) {
@@ -281,13 +249,4 @@ func (*WebsocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (tssn 
 		return
 	}
 	return
-}
-
-func (sm *SessionManager) IsIndex(r *http.Request) (result bool) {
-	origin, _, _ := strings.Cut(r.Host, ":")
-	return origin == sm.HOST
-}
-
-func (sm *SessionManager) IsUpgrade(r *http.Request) (result bool) {
-	return r.URL.Query().Get("x-websocket-upgrade") != "" && sm.IsIndex(r)
 }

@@ -7,16 +7,18 @@ import (
 	"github.com/webteleport/webteleport/transport"
 )
 
-var _ ISessionManagerStorage = (*SessionManager)(nil)
+var _ Storage = (*SessionStore)(nil)
 
 // / transport agnostic CRUD
-type ISessionManagerStorage interface {
+type Storage interface {
 	// Create
 	Add(k string, tssn transport.Session, tstm transport.Stream, vals url.Values)
 	// Read
 	Get(k string) (transport.Session, bool)
+	Records() []Record
+	RecordsHandler(w http.ResponseWriter, r *http.Request)
 	// Update
-	IncrementVisit(k string)
+	Visited(k string)
 	// Remove
 	Remove(transport.Session)
 	// Rand
@@ -24,8 +26,8 @@ type ISessionManagerStorage interface {
 	Negotiate(r *http.Request, root string, tssn transport.Session, tstm transport.Stream) (key string, err error)
 }
 
-var _ Upgrader = (*SessionManager)(nil)
 var _ Upgrader = (*Relay)(nil)
+var _ Upgrader = (*WSServer)(nil)
 
 type Upgrader interface {
 	IsIndex(r *http.Request) bool
@@ -33,21 +35,11 @@ type Upgrader interface {
 	Upgrade(w http.ResponseWriter, r *http.Request) (transport.Session, transport.Stream, error)
 }
 
-type ISessionManagerHandler interface {
-	// Public
-	IndexHandler(w http.ResponseWriter, r *http.Request)
-	ServeHTTP(w http.ResponseWriter, r *http.Request)
+var _ IRelay = (*Relay)(nil)
+var _ IRelay = (*WSServer)(nil)
 
-	// Admin
-	ApiSessionsHandler(w http.ResponseWriter, r *http.Request)
-
-	// Proxy
-	ConnectHandler(w http.ResponseWriter, r *http.Request)
-}
-
-var _ SessionManagerInterface = (*SessionManager)(nil)
-
-type SessionManagerInterface interface {
-	ISessionManagerStorage
-	ISessionManagerHandler
+type IRelay interface {
+	Upgrader
+	Storage
+	http.Handler
 }

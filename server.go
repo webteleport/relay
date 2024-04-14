@@ -52,8 +52,8 @@ func init() {
 func New(host, port string, tlsConfig *tls.Config) *Relay {
 	store := NewSessionStore()
 	r := &Relay{
-		HOST:         host,
-		SessionStore: store,
+		HOST:    host,
+		Storage: store,
 		WTServer: &webtransportGo.Server{
 			CheckOrigin: func(*http.Request) bool { return true },
 		},
@@ -70,9 +70,9 @@ func New(host, port string, tlsConfig *tls.Config) *Relay {
 
 type Relay struct {
 	HOST string
-	*SessionStore
+	Storage
 	WTServer *webtransportGo.Server
-	WSServer *SessionManager
+	WSServer *WSServer
 	Next     http.Handler
 }
 
