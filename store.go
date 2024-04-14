@@ -153,23 +153,23 @@ func (s *SessionStore) Allocate(r *http.Request, root string) (string, string, e
 	)
 
 	sub := ""
-	pickRandom := len(candidates) == 0
-
-	// Try to lease the first available subdomain if candidates are provided
-	for _, pfx := range candidates {
-		k := fmt.Sprintf("%s.%s", pfx, root)
-		rec, exist := s.Record[k]
-		if !exist || (clobber != "" && rec.Tags.Get("clobber") == clobber) {
-			sub = pfx
-			break
+	if len(candidates) == 0 {
+		sub = rng.NewDockerSepDigits("-", 4)
+	} else {
+		// Try to lease the first available subdomain if candidates are provided
+		for _, pfx := range candidates {
+			k := fmt.Sprintf("%s.%s", pfx, root)
+			rec, exist := s.Record[k]
+			if !exist || (clobber != "" && rec.Tags.Get("clobber") == clobber) {
+				sub = pfx
+				break
+			}
 		}
 	}
-
-	if sub == "" && !pickRandom {
-		return "", "", fmt.Errorf("none of your requested subdomains are currently available: %v", candidates)
+	if sub == "" {
+		err := fmt.Errorf("none of your requested subdomains are currently available: %v", candidates)
+		return "", "", err
 	}
-
-	sub = rng.NewDockerSepDigits("-", 4)
 
 	hostname := fmt.Sprintf("%s.%s", sub, root)
 	hostnamePath := fmt.Sprintf("%s/%s/", root, sub)
