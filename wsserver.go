@@ -9,25 +9,18 @@ import (
 
 func NewWSServer(host string, store Storage) *WSServer {
 	return &WSServer{
-		HOST:        host,
-		Storage:     store,
-		Upgrader:    &WebsocketUpgrader{host},
-		Proxy:       NewProxyHandler(),
-		PostUpgrade: store,
+		HOST:     host,
+		Storage:  store,
+		Upgrader: &WebsocketUpgrader{host},
+		Proxy:    NewProxyHandler(),
 	}
-}
-
-func (s *WSServer) WithPostUpgrade(p http.Handler) *WSServer {
-	s.PostUpgrade = p
-	return s
 }
 
 type WSServer struct {
 	HOST string
 	Storage
 	Upgrader
-	Proxy       http.Handler
-	PostUpgrade http.Handler
+	Proxy http.Handler
 }
 
 func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -64,5 +57,5 @@ func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.PostUpgrade.ServeHTTP(w, r)
+	s.Storage.ServeHTTP(w, r)
 }

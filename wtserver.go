@@ -10,7 +10,7 @@ import (
 	wt "github.com/quic-go/webtransport-go"
 )
 
-func NewWTServer(host, port string, store Storage, tlsConfig *tls.Config) *WTServer {
+func NewWTServer(host string, store Storage) *WTServer {
 	u := &WebtransportUpgrader{
 		root: host,
 		Server: &wt.Server{
@@ -21,19 +21,25 @@ func NewWTServer(host, port string, store Storage, tlsConfig *tls.Config) *WTSer
 		HOST:                 host,
 		Storage:              store,
 		WebtransportUpgrader: u,
-		PostUpgrade:          store,
 	}
 	u.Server.H3 = http3.Server{
-		Addr:            port,
-		Handler:         s,
-		EnableDatagrams: true,
-		TLSConfig:       tlsConfig,
+		Handler: s,
 	}
 	return s
 }
 
-func (s *WTServer) WithPostUpgrade(p http.Handler) *WTServer {
-	s.PostUpgrade = p
+func (s *WTServer) WithAddr(a string) *WTServer {
+	s.WebtransportUpgrader.Server.H3.Addr = a
+	return s
+}
+
+func (s *WTServer) WithTLSConfig(tlsConfig *tls.Config) *WTServer {
+	s.WebtransportUpgrader.Server.H3.TLSConfig = tlsConfig
+	return s
+}
+
+func (s *WTServer) WithHandler(h http.Handler) *WTServer {
+	s.WebtransportUpgrader.Server.H3.Handler = h
 	return s
 }
 
@@ -41,7 +47,6 @@ type WTServer struct {
 	HOST string
 	Storage
 	*WebtransportUpgrader
-	PostUpgrade http.Handler
 }
 
 func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -64,5 +69,5 @@ func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.PostUpgrade.ServeHTTP(w, r)
+	s.Storage.ServeHTTP(w, r)
 }
