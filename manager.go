@@ -1,183 +1,45 @@
 package relay
 
 import (
-	"bufio"
 	"context"
 	"expvar"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"os"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/btwiuse/rng"
 	"github.com/btwiuse/tags"
 	"github.com/btwiuse/wsconn"
 	"github.com/hashicorp/yamux"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/transport"
 	"github.com/webteleport/webteleport/transport/websocket"
-	"golang.org/x/net/idna"
 )
 
-func NewSessionManager(host string) *SessionManager {
+func NewWSServer(host string, store *SessionStore) *SessionManager {
 	return &SessionManager{
-		HOST:     host,
-		counter:  0,
-		sessions: map[string]transport.Session{},
-		values:   map[string]url.Values{},
-		ssnstamp: map[string]time.Time{},
-		ssn_cntr: map[string]int{},
-		slock:    &sync.RWMutex{},
-		proxy:    NewProxyHandler(),
+		HOST:              host,
+		SessionStore:      store,
+		WebsocketUpgrader: &WebsocketUpgrader{},
+		Proxy:             NewProxyHandler(),
 	}
 }
 
 type SessionManager struct {
-	HOST     string
-	counter  int
-	sessions map[string]transport.Session
-	values   map[string]url.Values
-	ssnstamp map[string]time.Time
-	ssn_cntr map[string]int
-	slock    *sync.RWMutex
-	proxy    http.Handler
-}
-
-func (sm *SessionManager) DelSession(ssn transport.Session) {
-	sm.slock.Lock()
-	for k, v := range sm.sessions {
-		if v == ssn {
-			delete(sm.sessions, k)
-			delete(sm.values, k)
-			delete(sm.ssnstamp, k)
-			delete(sm.ssn_cntr, k)
-			emsg := fmt.Sprintf("Recycled %s", k)
-			slog.Info(emsg)
-		}
-	}
-	sm.slock.Unlock()
-	expvars.WebteleportRelaySessionsClosed.Add(1)
-}
-
-func (sm *SessionManager) Get(k string) (transport.Session, bool) {
-	k, _ = idna.ToASCII(k)
-	host, _, _ := strings.Cut(k, ":")
-	sm.slock.RLock()
-	ssn, ok := sm.sessions[host]
-	sm.slock.RUnlock()
-	return ssn, ok
-}
-
-func (sm *SessionManager) Add(k string, tssn transport.Session, vals url.Values) error {
-	k, err := idna.ToASCII(k)
-	if err != nil {
-		return err
-	}
-	sm.slock.Lock()
-	sm.counter += 1
-	sm.sessions[k] = tssn
-	sm.values[k] = vals
-	sm.ssnstamp[k] = time.Now()
-	sm.ssn_cntr[k] = 0
-	sm.slock.Unlock()
-	return nil
-}
-
-func (sm *SessionManager) Lease(r *http.Request, tssn transport.Session, tstm transport.Stream) error {
-	var (
-		candidates = utils.ParseDomainCandidates(r.URL.Path)
-		values     = r.URL.Query()
-		clobber    = values.Get("clobber")
-		canClobber = clobber != "" && values.Get("clobber") == clobber
-	)
-
-	allowRandom := len(candidates) == 0
-	leaseCandidate := ""
-
-	// Try to lease the first available subdomain if candidates are provided
-	for _, pfx := range candidates {
-		k := fmt.Sprintf("%s.%s", pfx, sm.HOST)
-		if _, exist := sm.Get(k); !exist || canClobber {
-			leaseCandidate = pfx
-			break
-		}
-	}
-
-	// If no specified candidates are available and random is not allowed, return with an error
-	if leaseCandidate == "" && !allowRandom {
-		emsg := fmt.Sprintf("ERR %s: %v\n", "none of your requested subdomains are currently available", candidates)
-		_, err := io.WriteString(tstm, emsg)
-		return err
-	}
-
-	// If no candidates were specified, generate a random subdomain
-	if leaseCandidate == "" {
-		leaseCandidate = rng.NewDockerSepDigits("-", 4)
-	}
-
-	hostname := fmt.Sprintf("%s.%s", leaseCandidate, sm.HOST)
-	hostnamePath := fmt.Sprintf("%s/%s/", sm.HOST, leaseCandidate)
-
-	reply := fmt.Sprintf("HOST %s\n", hostname)
-	if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/" {
-		reply = fmt.Sprintf("HOST %s\n", hostnamePath)
-	}
-
-	// Notify the client of the leaseCandidate
-	if _, err := io.WriteString(tstm, reply); err != nil {
-		return err
-	}
-
-	// Add the leaseCandidate to the session manager
-	if err := sm.Add(hostname, tssn, values); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-var PingInterval = 5 * time.Second
-
-func (sm *SessionManager) Ping(tssn transport.Session, tstm transport.Stream) {
-	for {
-		time.Sleep(PingInterval)
-		_, err := io.WriteString(tstm, fmt.Sprintf("%s\n", "PING"))
-		if err != nil {
-			break
-		}
-	}
-	sm.DelSession(tssn)
-}
-
-func (sm *SessionManager) Scan(tssn transport.Session, tstm transport.Stream) {
-	scanner := bufio.NewScanner(tstm)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "PONG" {
-			// currently client reply nothing to server PING's
-			// so this is a noop
-			continue
-		}
-		if line == "CLOSE" {
-			// close session immediately
-			sm.DelSession(tssn)
-			break
-		}
-		slog.Warn(fmt.Sprintf("stm0: unknown command: %s", line))
-	}
+	HOST string
+	*SessionStore
+	*WebsocketUpgrader
+	Proxy http.Handler
 }
 
 func (sm *SessionManager) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("NAIVE") == "" || r.Header.Get("Naive") == "" {
-		sm.proxy.ServeHTTP(w, r)
+		sm.Proxy.ServeHTTP(w, r)
 		return
 	}
 
@@ -336,20 +198,29 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if sm.IsWebsocketUpgrade(r) {
-		tssn, tstm, err := UpgradeWebsocketSession(w, r)
+	if sm.IsUpgrade(r) {
+		tssn, tstm, err := sm.Upgrade(w, r)
 		if err != nil {
 			slog.Warn(fmt.Sprintf("upgrade websocket session failed: %s", err))
+			w.WriteHeader(500)
 			return
 		}
-		sm.AddSession(r, tssn, tstm)
+
+		key, err := sm.Negotiate(r, sm.HOST, tssn, tstm)
+		if err != nil {
+			slog.Warn(fmt.Sprintf("negotiate websocket session failed: %s", err))
+			return
+		}
+
+		values := r.URL.Query()
+		sm.Add(key, tssn, tstm, values)
+
 		return
 	}
 	// for HTTP_PROXY r.Method = GET && r.Host = google.com
 	// for HTTPs_PROXY r.Method = GET && r.Host = google.com:443
 	// they are currently not supported and will be handled by the 404 handler
-	origin, _, _ := strings.Cut(r.Host, ":")
-	if origin == sm.HOST {
+	if sm.IsIndex(r) {
 		sm.IndexHandler(w, r)
 		return
 	}
@@ -388,17 +259,9 @@ func (sm *SessionManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	expvars.WebteleportRelayStreamsClosed.Add(1)
 }
 
-func (sm *SessionManager) AddSession(r *http.Request, tssn transport.Session, tstm transport.Stream) {
-	if err := sm.Lease(r, tssn, tstm); err != nil {
-		slog.Warn(fmt.Sprintf("leasing failed: %s", err))
-		return
-	}
-	go sm.Ping(tssn, tstm)
-	go sm.Scan(tssn, tstm)
-	expvars.WebteleportRelaySessionsAccepted.Add(1)
-}
+type WebsocketUpgrader struct{}
 
-func UpgradeWebsocketSession(w http.ResponseWriter, r *http.Request) (tssn transport.Session, tstm transport.Stream, err error) {
+func (*WebsocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (tssn transport.Session, tstm transport.Stream, err error) {
 	conn, err := wsconn.Wrconn(w, r)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
@@ -420,7 +283,11 @@ func UpgradeWebsocketSession(w http.ResponseWriter, r *http.Request) (tssn trans
 	return
 }
 
-func (sm *SessionManager) IsWebsocketUpgrade(r *http.Request) (result bool) {
+func (sm *SessionManager) IsIndex(r *http.Request) (result bool) {
 	origin, _, _ := strings.Cut(r.Host, ":")
-	return r.URL.Query().Get("x-websocket-upgrade") != "" && origin == sm.HOST
+	return origin == sm.HOST
+}
+
+func (sm *SessionManager) IsUpgrade(r *http.Request) (result bool) {
+	return r.URL.Query().Get("x-websocket-upgrade") != "" && sm.IsIndex(r)
 }
