@@ -44,17 +44,17 @@ type Record struct {
 	Visited int               `json:"visited"`
 }
 
-func (sm *SessionStore) Records() (all []*Record) {
-	all = maps.Values(sm.Record)
+func (s *SessionStore) Records() (all []*Record) {
+	all = maps.Values(s.Record)
 	sort.Slice(all, func(i, j int) bool {
 		return all[i].Since.After(all[j].Since)
 	})
 	return
 }
 
-func (sm *SessionStore) RecordsHandler(w http.ResponseWriter, r *http.Request) {
+func (s *SessionStore) RecordsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	all := sm.Records()
+	all := s.Records()
 	resp, err := tags.UnescapedJSONMarshalIndent(all, "  ")
 	if err != nil {
 		slog.Warn(fmt.Sprintf("json marshal failed: %s", err))
@@ -63,40 +63,39 @@ func (sm *SessionStore) RecordsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
-func (sm *SessionStore) Visited(k string) {
-	sm.Lock.Lock()
-	rec, ok := sm.Record[k]
+func (s *SessionStore) Visited(k string) {
+	s.Lock.Lock()
+	rec, ok := s.Record[k]
 	if ok {
 		rec.Visited += 1
 	}
-	sm.Lock.Unlock()
+	s.Lock.Unlock()
 }
 
-func (sm *SessionStore) Remove(k string) {
-	sm.Lock.Lock()
-	delete(sm.Record, k)
-	sm.Lock.Unlock()
+func (s *SessionStore) Remove(k string) {
+	s.Lock.Lock()
+	delete(s.Record, k)
+	s.Lock.Unlock()
 	emsg := fmt.Sprintf("Recycled %s", k)
 	slog.Info(emsg)
 	expvars.WebteleportRelaySessionsClosed.Add(1)
 }
 
-func (sm *SessionStore) Get(k string) (transport.Session, bool) {
+func (s *SessionStore) Get(k string) (transport.Session, bool) {
 	k, _ = idna.ToASCII(k)
 	host, _, _ := strings.Cut(k, ":")
-	sm.Lock.RLock()
-	// ssn, ok := sm.Sessions[host]
-	rec, ok := sm.Record[host]
-	sm.Lock.RUnlock()
+	s.Lock.RLock()
+	rec, ok := s.Record[host]
+	s.Lock.RUnlock()
 	if ok {
 		return rec.Session, true
 	}
 	return nil, false
 }
 
-func (sm *SessionStore) Add(k string, tssn transport.Session, tstm transport.Stream, r *http.Request) {
+func (s *SessionStore) Add(k string, tssn transport.Session, tstm transport.Stream, r *http.Request) {
 	k, _ = idna.ToASCII(k)
-	sm.Lock.Lock()
+	s.Lock.Lock()
 
 	since := time.Now()
 	tags := tags.Tags{Values: r.URL.Query()}
@@ -107,28 +106,28 @@ func (sm *SessionStore) Add(k string, tssn transport.Session, tstm transport.Str
 		Visited: 0,
 		Key:     k,
 	}
-	sm.Record[k] = rec
+	s.Record[k] = rec
 
-	sm.Lock.Unlock()
+	s.Lock.Unlock()
 
-	go sm.Ping(k, tstm)
-	go sm.Scan(k, tstm)
+	go s.Ping(k, tstm)
+	go s.Scan(k, tstm)
 
 	expvars.WebteleportRelaySessionsAccepted.Add(1)
 }
 
-func (sm *SessionStore) Ping(k string, tstm transport.Stream) {
+func (s *SessionStore) Ping(k string, tstm transport.Stream) {
 	for {
-		time.Sleep(sm.PingInterval)
+		time.Sleep(s.PingInterval)
 		_, err := io.WriteString(tstm, fmt.Sprintf("%s\n", "PING"))
 		if err != nil {
 			break
 		}
 	}
-	sm.Remove(k)
+	s.Remove(k)
 }
 
-func (sm *SessionStore) Scan(k string, tstm transport.Stream) {
+func (s *SessionStore) Scan(k string, tstm transport.Stream) {
 	scanner := bufio.NewScanner(tstm)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -139,14 +138,14 @@ func (sm *SessionStore) Scan(k string, tstm transport.Stream) {
 		}
 		if line == "CLOSE" {
 			// close session immediately
-			sm.Remove(k)
+			s.Remove(k)
 			break
 		}
 		slog.Warn(fmt.Sprintf("stm0: unknown command: %s", line))
 	}
 }
 
-func (sm *SessionStore) Allocate(r *http.Request, root string) (string, string, error) {
+func (s *SessionStore) Allocate(r *http.Request, root string) (string, string, error) {
 	var (
 		candidates = utils.ParseDomainCandidates(r.URL.Path)
 		Values     = r.URL.Query()
@@ -159,7 +158,7 @@ func (sm *SessionStore) Allocate(r *http.Request, root string) (string, string, 
 	// Try to lease the first available subdomain if candidates are provided
 	for _, pfx := range candidates {
 		k := fmt.Sprintf("%s.%s", pfx, root)
-		rec, exist := sm.Record[k]
+		rec, exist := s.Record[k]
 		if !exist || (clobber != "" && rec.Tags.Get("clobber") == clobber) {
 			sub = pfx
 			break
@@ -182,8 +181,8 @@ func (sm *SessionStore) Allocate(r *http.Request, root string) (string, string, 
 	return key, hostname, nil
 }
 
-func (sm *SessionStore) Negotiate(r *http.Request, root string, tssn transport.Session, tstm transport.Stream) (string, error) {
-	key, hp, err := sm.Allocate(r, root)
+func (s *SessionStore) Negotiate(r *http.Request, root string, tssn transport.Session, tstm transport.Stream) (string, error) {
+	key, hp, err := s.Allocate(r, root)
 	if err != nil {
 		// Notify the client of the lease error
 		_, err1 := io.WriteString(tstm, fmt.Sprintf("ERR %s\n", err))
@@ -201,14 +200,14 @@ func (sm *SessionStore) Negotiate(r *http.Request, root string, tssn transport.S
 	return key, nil
 }
 
-func (sm *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	tssn, ok := sm.Get(r.Host)
+func (s *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	tssn, ok := s.Get(r.Host)
 	if !ok {
 		utils.HostNotFoundHandler().ServeHTTP(w, r)
 		return
 	}
 
-	sm.Visited(r.Host)
+	s.Visited(r.Host)
 
 	rw := func(req *httputil.ProxyRequest) {
 		req.SetXForwarded()

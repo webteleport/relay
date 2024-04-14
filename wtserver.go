@@ -17,18 +17,24 @@ func NewWTServer(host, port string, store Storage, tlsConfig *tls.Config) *WTSer
 			CheckOrigin: func(*http.Request) bool { return true },
 		},
 	}
-	r := &WTServer{
+	s := &WTServer{
 		HOST:                 host,
 		Storage:              store,
 		WebtransportUpgrader: u,
+		PostUpgrade:          store,
 	}
-	u.H3 = http3.Server{
+	u.Server.H3 = http3.Server{
 		Addr:            port,
-		Handler:         r,
+		Handler:         s,
 		EnableDatagrams: true,
 		TLSConfig:       tlsConfig,
 	}
-	return r
+	return s
+}
+
+func (s *WTServer) WithPostUpgrade(p http.Handler) *WTServer {
+	s.PostUpgrade = p
+	return s
 }
 
 type WTServer struct {
@@ -58,10 +64,5 @@ func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.PostUpgrade != nil {
-		s.PostUpgrade.ServeHTTP(w, r)
-		return
-	}
-
-	s.Storage.ServeHTTP(w, r)
+	s.PostUpgrade.ServeHTTP(w, r)
 }
