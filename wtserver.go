@@ -24,6 +24,8 @@ func NewWTServer(host string, store Storage) *WTServer {
 	}
 	u.Server.H3 = http3.Server{
 		Handler: s,
+		// WebTransport requires DATAGRAM support
+		EnableDatagrams: true,
 	}
 	return s
 }
