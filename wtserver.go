@@ -1,53 +1,14 @@
 package relay
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
-	"strings"
 
-	"github.com/caddyserver/certmagic"
-	"github.com/libdns/digitalocean"
 	"github.com/quic-go/quic-go/http3"
 	wt "github.com/quic-go/webtransport-go"
-	"github.com/webteleport/webteleport/transport"
-	"github.com/webteleport/webteleport/transport/webtransport"
 )
-
-func getCertificatesOnDemand() {
-	// if the decision function returns an error, a certificate
-	// may not be obtained for that name at that time
-	certmagic.Default.OnDemand = &certmagic.OnDemandConfig{
-		DecisionFunc: func(_ctx context.Context, name string) error {
-			return nil
-		},
-	}
-}
-
-func getWildcardCertificates() {
-	certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
-		DNSProvider: &digitalocean.Provider{
-			APIToken: os.Getenv("DIGITALOCEAN_ACCESS_TOKEN"),
-		},
-	}
-}
-
-func init() {
-	var EmailName = "btwiuse"
-	var EmailContext = "webteleport"
-	var EmailSuffix = "gmail.com"
-
-	// provide an email address
-	certmagic.DefaultACME.Email = fmt.Sprintf("%s+%s@%s", EmailName, EmailContext, EmailSuffix)
-
-	// read and agree to your CA's legal documents
-	certmagic.DefaultACME.Agreed = true
-
-	getCertificatesOnDemand()
-}
 
 func NewWTServer(host, port string, store Storage, tlsConfig *tls.Config) *WTServer {
 	u := &WebtransportUpgrader{
@@ -103,40 +64,4 @@ func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.Storage.ServeHTTP(w, r)
-}
-
-type WebtransportUpgrader struct {
-	root string
-	*wt.Server
-}
-
-func (s *WebtransportUpgrader) Root() string {
-	return s.root
-}
-
-func (s *WebtransportUpgrader) IsRoot(r *http.Request) (result bool) {
-	origin, _, _ := strings.Cut(r.Host, ":")
-	return origin == s.Root()
-}
-
-func (s *WebtransportUpgrader) IsUpgrade(r *http.Request) (result bool) {
-	return r.URL.Query().Get("x-webtransport-upgrade") != "" && s.IsRoot(r)
-}
-
-func (s *WebtransportUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (transport.Session, transport.Stream, error) {
-	ssn, err := s.Server.Upgrade(w, r)
-	if err != nil {
-		slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
-		w.WriteHeader(500)
-		return nil, nil, err
-	}
-
-	tssn := &webtransport.WebtransportSession{ssn}
-	tstm, err := tssn.OpenStream(context.Background())
-	if err != nil {
-		slog.Warn(fmt.Sprintf("stm0 init failed: %s", err))
-		return nil, nil, err
-	}
-
-	return tssn, tstm, nil
 }
