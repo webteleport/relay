@@ -40,8 +40,8 @@ func (s *WTServer) WithTLSConfig(tlsConfig *tls.Config) *WTServer {
 	return s
 }
 
-func (s *WTServer) WithHandler(h http.Handler) *WTServer {
-	s.WebtransportUpgrader.Server.H3.Handler = h
+func (s *WTServer) WithPostUpgrade(h http.Handler) *WTServer {
+	s.PostUpgrade = h
 	return s
 }
 
@@ -49,6 +49,7 @@ type WTServer struct {
 	HOST string
 	Storage
 	*WebtransportUpgrader
+	PostUpgrade http.Handler
 }
 
 func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -68,6 +69,11 @@ func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		s.Add(key, tssn, tstm, r)
 
+		return
+	}
+
+	if s.PostUpgrade != nil {
+		s.PostUpgrade.ServeHTTP(w, r)
 		return
 	}
 

@@ -16,11 +16,17 @@ func NewWSServer(host string, store Storage) *WSServer {
 	}
 }
 
+func (s *WSServer) WithPostUpgrade(h http.Handler) *WSServer {
+	s.PostUpgrade = h
+	return s
+}
+
 type WSServer struct {
 	HOST string
 	Storage
 	Upgrader
-	Proxy http.Handler
+	Proxy       http.Handler
+	PostUpgrade http.Handler
 }
 
 func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -54,6 +60,11 @@ func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// they are currently not supported and will be handled by the 404 handler
 	if s.IsRoot(r) {
 		s.IndexHandler(w, r)
+		return
+	}
+
+	if s.PostUpgrade != nil {
+		s.PostUpgrade.ServeHTTP(w, r)
 		return
 	}
 
