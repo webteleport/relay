@@ -18,6 +18,7 @@ require (
 	github.com/quic-go/webtransport-go v0.7.0
 	github.com/webteleport/utils v0.2.10
 	github.com/webteleport/webteleport v0.5.1
+	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225
 	golang.org/x/net v0.22.0
 )
 
@@ -46,7 +47,6 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/crypto v0.21.0 // indirect
-	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225 // indirect
 	golang.org/x/mod v0.15.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
 	golang.org/x/sys v0.18.0 // indirect

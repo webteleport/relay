@@ -12,7 +12,7 @@ import (
 	"github.com/caddyserver/certmagic"
 	"github.com/libdns/digitalocean"
 	"github.com/quic-go/quic-go/http3"
-	webtransportGo "github.com/quic-go/webtransport-go"
+	wt "github.com/quic-go/webtransport-go"
 	"github.com/webteleport/webteleport/transport"
 	"github.com/webteleport/webteleport/transport/webtransport"
 )
@@ -54,7 +54,7 @@ func New(host, port string, tlsConfig *tls.Config) *Relay {
 	r := &Relay{
 		HOST:    host,
 		Storage: store,
-		WTServer: &webtransportGo.Server{
+		WTServer: &wt.Server{
 			CheckOrigin: func(*http.Request) bool { return true },
 		},
 		WSServer: NewWSServer(host, store),
@@ -71,12 +71,10 @@ func New(host, port string, tlsConfig *tls.Config) *Relay {
 type Relay struct {
 	HOST string
 	Storage
-	WTServer *webtransportGo.Server
+	WTServer *wt.Server
 	WSServer *WSServer
 	Next     http.Handler
 }
-
-type WebtransportUpgraderFunc func(http.ResponseWriter, *http.Request) (*webtransportGo.Session, error)
 
 func (s *Relay) IsIndex(r *http.Request) (result bool) {
 	origin, _, _ := strings.Cut(r.Host, ":")

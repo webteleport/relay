@@ -16,53 +16,36 @@ import (
 	"github.com/btwiuse/tags"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/transport"
+	"golang.org/x/exp/maps"
 	"golang.org/x/net/idna"
 )
 
 func NewSessionStore() *SessionStore {
 	return &SessionStore{
-		counter:  0,
-		sessions: map[string]transport.Session{},
-		values:   map[string]url.Values{},
-		ssnstamp: map[string]time.Time{},
-		ssn_cntr: map[string]int{},
-		slock:    &sync.RWMutex{},
-		interval: time.Second * 5,
+		Lock:         &sync.RWMutex{},
+		PingInterval: time.Second * 5,
+		Record:       map[string]*Record{},
 	}
 }
 
 type SessionStore struct {
-	counter  int
-	sessions map[string]transport.Session
-	values   map[string]url.Values
-	ssnstamp map[string]time.Time
-	ssn_cntr map[string]int
-	slock    *sync.RWMutex
-	interval time.Duration
+	Lock         *sync.RWMutex
+	PingInterval time.Duration
+	Record       map[string]*Record
 }
 
 type Record struct {
-	Host      string    `json:"host"`
-	CreatedAt time.Time `json:"created_at"`
-	Tags      tags.Tags `json:"tags"`
-	Visited   int       `json:"visited"`
+	Key     string            `json:"key"`
+	Session transport.Session `json:"-"`
+	Tags    tags.Tags         `json:"tags"`
+	Since   time.Time         `json:"since"`
+	Visited int               `json:"visited"`
 }
 
-func (sm *SessionStore) Records() (all []Record) {
-	for host := range sm.sessions {
-		since := sm.ssnstamp[host]
-		tags := tags.Tags{Values: sm.values[host]}
-		visited := sm.ssn_cntr[host]
-		record := Record{
-			Host:      host,
-			CreatedAt: since,
-			Tags:      tags,
-			Visited:   visited,
-		}
-		all = append(all, record)
-	}
+func (sm *SessionStore) Records() (all []*Record) {
+	all = maps.Values(sm.Record)
 	sort.Slice(all, func(i, j int) bool {
-		return all[i].CreatedAt.After(all[j].CreatedAt)
+		return all[i].Since.After(all[j].Since)
 	})
 	return
 }
@@ -79,65 +62,71 @@ func (sm *SessionStore) RecordsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (sm *SessionStore) Visited(k string) {
-	sm.slock.Lock()
-	sm.ssn_cntr[k] += 1
-	sm.slock.Unlock()
+	sm.Lock.Lock()
+	rec, ok := sm.Record[k]
+	if ok {
+		rec.Visited += 1
+	}
+	sm.Lock.Unlock()
 }
 
-func (sm *SessionStore) Remove(ssn transport.Session) {
-	sm.slock.Lock()
-	for k, v := range sm.sessions {
-		if v == ssn {
-			sm.counter -= 1
-			delete(sm.sessions, k)
-			delete(sm.values, k)
-			delete(sm.ssnstamp, k)
-			delete(sm.ssn_cntr, k)
-			emsg := fmt.Sprintf("Recycled %s", k)
-			slog.Info(emsg)
-		}
-	}
-	sm.slock.Unlock()
+func (sm *SessionStore) Remove(k string) {
+	sm.Lock.Lock()
+	delete(sm.Record, k)
+	sm.Lock.Unlock()
+	emsg := fmt.Sprintf("Recycled %s", k)
+	slog.Info(emsg)
 	expvars.WebteleportRelaySessionsClosed.Add(1)
 }
 
 func (sm *SessionStore) Get(k string) (transport.Session, bool) {
 	k, _ = idna.ToASCII(k)
 	host, _, _ := strings.Cut(k, ":")
-	sm.slock.RLock()
-	ssn, ok := sm.sessions[host]
-	sm.slock.RUnlock()
-	return ssn, ok
+	sm.Lock.RLock()
+	// ssn, ok := sm.Sessions[host]
+	rec, ok := sm.Record[host]
+	sm.Lock.RUnlock()
+	if ok {
+		return rec.Session, true
+	}
+	return nil, false
 }
 
 func (sm *SessionStore) Add(k string, tssn transport.Session, tstm transport.Stream, vals url.Values) {
 	k, _ = idna.ToASCII(k)
-	sm.slock.Lock()
-	sm.counter += 1
-	sm.sessions[k] = tssn
-	sm.values[k] = vals
-	sm.ssnstamp[k] = time.Now()
-	sm.ssn_cntr[k] = 0
-	sm.slock.Unlock()
+	sm.Lock.Lock()
 
-	go sm.Ping(tssn, tstm)
-	go sm.Scan(tssn, tstm)
+	since := time.Now()
+	tags := tags.Tags{Values: vals}
+	rec := &Record{
+		Session: tssn,
+		Tags:    tags,
+		Since:   since,
+		Visited: 0,
+		Key:     k,
+	}
+	sm.Record[k] = rec
+
+	sm.Lock.Unlock()
+
+	go sm.Ping(k, tstm)
+	go sm.Scan(k, tstm)
 
 	expvars.WebteleportRelaySessionsAccepted.Add(1)
 }
 
-func (sm *SessionStore) Ping(tssn transport.Session, tstm transport.Stream) {
+func (sm *SessionStore) Ping(k string, tstm transport.Stream) {
 	for {
-		time.Sleep(sm.interval)
+		time.Sleep(sm.PingInterval)
 		_, err := io.WriteString(tstm, fmt.Sprintf("%s\n", "PING"))
 		if err != nil {
 			break
 		}
 	}
-	sm.Remove(tssn)
+	sm.Remove(k)
 }
 
-func (sm *SessionStore) Scan(tssn transport.Session, tstm transport.Stream) {
+func (sm *SessionStore) Scan(k string, tstm transport.Stream) {
 	scanner := bufio.NewScanner(tstm)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -148,7 +137,7 @@ func (sm *SessionStore) Scan(tssn transport.Session, tstm transport.Stream) {
 		}
 		if line == "CLOSE" {
 			// close session immediately
-			sm.Remove(tssn)
+			sm.Remove(k)
 			break
 		}
 		slog.Warn(fmt.Sprintf("stm0: unknown command: %s", line))
@@ -158,31 +147,31 @@ func (sm *SessionStore) Scan(tssn transport.Session, tstm transport.Stream) {
 func (sm *SessionStore) Allocate(r *http.Request, root string) (string, string, error) {
 	var (
 		candidates = utils.ParseDomainCandidates(r.URL.Path)
-		values     = r.URL.Query()
-		clobber    = values.Get("clobber")
-		canClobber = clobber != "" && values.Get("clobber") == clobber
+		Values     = r.URL.Query()
+		clobber    = Values.Get("clobber")
 	)
 
-	leaseCandidate := ""
-	allowRandom := len(candidates) == 0
+	sub := ""
+	pickRandom := len(candidates) == 0
 
 	// Try to lease the first available subdomain if candidates are provided
 	for _, pfx := range candidates {
 		k := fmt.Sprintf("%s.%s", pfx, root)
-		if _, exist := sm.Get(k); !exist || canClobber {
-			leaseCandidate = pfx
+		rec, exist := sm.Record[k]
+		if !exist || (clobber != "" && rec.Tags.Get("clobber") == clobber) {
+			sub = pfx
 			break
 		}
 	}
 
-	if !(leaseCandidate == "" && allowRandom) {
+	if sub == "" && !pickRandom {
 		return "", "", fmt.Errorf("none of your requested subdomains are currently available: %v", candidates)
 	}
 
-	leaseCandidate = rng.NewDockerSepDigits("-", 4)
+	sub = rng.NewDockerSepDigits("-", 4)
 
-	hostname := fmt.Sprintf("%s.%s", leaseCandidate, root)
-	hostnamePath := fmt.Sprintf("%s/%s/", root, leaseCandidate)
+	hostname := fmt.Sprintf("%s.%s", sub, root)
+	hostnamePath := fmt.Sprintf("%s/%s/", root, sub)
 	key := hostname
 
 	if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/" {
@@ -201,7 +190,7 @@ func (sm *SessionStore) Negotiate(r *http.Request, root string, tssn transport.S
 		}
 		return "", err
 	} else {
-		// Notify the client of the hostnamePath
+		// Notify the client of the hostname/path
 		_, err1 := io.WriteString(tstm, fmt.Sprintf("HOST %s\n", hp))
 		if err1 != nil {
 			return "", err1

@@ -15,12 +15,12 @@ type Storage interface {
 	Add(k string, tssn transport.Session, tstm transport.Stream, vals url.Values)
 	// Read
 	Get(k string) (transport.Session, bool)
-	Records() []Record
+	Records() []*Record
 	RecordsHandler(w http.ResponseWriter, r *http.Request)
 	// Update
 	Visited(k string)
 	// Remove
-	Remove(transport.Session)
+	Remove(k string)
 	// Rand
 	Allocate(r *http.Request, root string) (key string, hostnamePath string, err error)
 	Negotiate(r *http.Request, root string, tssn transport.Session, tstm transport.Stream) (key string, err error)
