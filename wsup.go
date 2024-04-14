@@ -33,20 +33,20 @@ func (s *WebsocketUpgrader) IsUpgrade(r *http.Request) (result bool) {
 func (*WebsocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (tssn transport.Session, tstm transport.Stream, err error) {
 	conn, err := wsconn.Wrconn(w, r)
 	if err != nil {
-		slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
+		slog.Warn(fmt.Sprintf("websocket upgrade failed: %s", err))
 		w.WriteHeader(500)
 		return
 	}
 	ssn, err := yamux.Server(conn, nil)
 	if err != nil {
-		slog.Warn(fmt.Sprintf("creating yamux.Server failed: %s", err))
+		slog.Warn(fmt.Sprintf("websocket creating yamux.Server failed: %s", err))
 		w.WriteHeader(500)
 		return
 	}
 	tssn = &websocket.WebsocketSession{ssn}
 	tstm, err = tssn.OpenStream(context.Background())
 	if err != nil {
-		slog.Warn(fmt.Sprintf("stm0 init failed: %s", err))
+		slog.Warn(fmt.Sprintf("websocket stm0 init failed: %s", err))
 		return
 	}
 	return

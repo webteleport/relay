@@ -33,7 +33,7 @@ func (s *WebtransportUpgrader) IsUpgrade(r *http.Request) (result bool) {
 func (s *WebtransportUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (transport.Session, transport.Stream, error) {
 	ssn, err := s.Server.Upgrade(w, r)
 	if err != nil {
-		slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
+		slog.Warn(fmt.Sprintf("webtransport upgrade failed: %s", err))
 		w.WriteHeader(500)
 		return nil, nil, err
 	}
@@ -41,7 +41,7 @@ func (s *WebtransportUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (
 	tssn := &webtransport.WebtransportSession{ssn}
 	tstm, err := tssn.OpenStream(context.Background())
 	if err != nil {
-		slog.Warn(fmt.Sprintf("stm0 init failed: %s", err))
+		slog.Warn(fmt.Sprintf("webtransport stm0 init failed: %s", err))
 		return nil, nil, err
 	}
 
