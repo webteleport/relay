@@ -49,17 +49,19 @@ func init() {
 	getCertificatesOnDemand()
 }
 
-func New(host, port string, tlsConfig *tls.Config) *Relay {
-	store := NewSessionStore()
-	r := &Relay{
-		HOST:    host,
-		Storage: store,
-		WTServer: &wt.Server{
+func NewWTServer(host, port string, store Storage, tlsConfig *tls.Config) *WTServer {
+	u := &WebtransportUpgrader{
+		root: host,
+		Server: &wt.Server{
 			CheckOrigin: func(*http.Request) bool { return true },
 		},
-		WSServer: NewWSServer(host, store),
 	}
-	r.WTServer.H3 = http3.Server{
+	r := &WTServer{
+		HOST:                 host,
+		Storage:              store,
+		WebtransportUpgrader: u,
+	}
+	u.H3 = http3.Server{
 		Addr:            port,
 		Handler:         r,
 		EnableDatagrams: true,
@@ -68,25 +70,61 @@ func New(host, port string, tlsConfig *tls.Config) *Relay {
 	return r
 }
 
-type Relay struct {
+type WTServer struct {
 	HOST string
 	Storage
-	WTServer *wt.Server
-	WSServer *WSServer
-	Next     http.Handler
+	*WebtransportUpgrader
+	PostUpgrade http.Handler
 }
 
-func (s *Relay) IsIndex(r *http.Request) (result bool) {
+func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if s.IsUpgrade(r) {
+		tssn, tstm, err := s.Upgrade(w, r)
+		if err != nil {
+			slog.Warn(fmt.Sprintf("upgrade webtransport session failed: %s", err))
+			w.WriteHeader(500)
+			return
+		}
+
+		key, err := s.Negotiate(r, s.HOST, tssn, tstm)
+		if err != nil {
+			slog.Warn(fmt.Sprintf("negotiate webtransport session failed: %s", err))
+			return
+		}
+
+		s.Add(key, tssn, tstm, r)
+
+		return
+	}
+
+	if s.PostUpgrade != nil {
+		s.PostUpgrade.ServeHTTP(w, r)
+		return
+	}
+
+	s.Storage.ServeHTTP(w, r)
+}
+
+type WebtransportUpgrader struct {
+	root string
+	*wt.Server
+}
+
+func (s *WebtransportUpgrader) Root() string {
+	return s.root
+}
+
+func (s *WebtransportUpgrader) IsRoot(r *http.Request) (result bool) {
 	origin, _, _ := strings.Cut(r.Host, ":")
-	return origin == s.HOST
+	return origin == s.Root()
 }
 
-func (s *Relay) IsUpgrade(r *http.Request) (result bool) {
-	return r.URL.Query().Get("x-webtransport-upgrade") != "" && s.IsIndex(r)
+func (s *WebtransportUpgrader) IsUpgrade(r *http.Request) (result bool) {
+	return r.URL.Query().Get("x-webtransport-upgrade") != "" && s.IsRoot(r)
 }
 
-func (s *Relay) Upgrade(w http.ResponseWriter, r *http.Request) (transport.Session, transport.Stream, error) {
-	ssn, err := s.WTServer.Upgrade(w, r)
+func (s *WebtransportUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (transport.Session, transport.Stream, error) {
+	ssn, err := s.Server.Upgrade(w, r)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("upgrading failed: %s", err))
 		w.WriteHeader(500)
@@ -101,31 +139,4 @@ func (s *Relay) Upgrade(w http.ResponseWriter, r *http.Request) (transport.Sessi
 	}
 
 	return tssn, tstm, nil
-}
-
-func (s *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !s.IsUpgrade(r) {
-		if s.Next != nil {
-			s.Next.ServeHTTP(w, r)
-		} else {
-			s.WSServer.ServeHTTP(w, r)
-		}
-		return
-	}
-
-	tssn, tstm, err := s.Upgrade(w, r)
-	if err != nil {
-		slog.Warn(fmt.Sprintf("upgrade webtransport session failed: %s", err))
-		w.WriteHeader(500)
-		return
-	}
-
-	key, err := s.Negotiate(r, s.HOST, tssn, tstm)
-	if err != nil {
-		slog.Warn(fmt.Sprintf("negotiate webtransport session failed: %s", err))
-		return
-	}
-
-	values := r.URL.Query()
-	s.Add(key, tssn, tstm, values)
 }

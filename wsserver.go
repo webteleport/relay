@@ -21,17 +21,17 @@ import (
 
 func NewWSServer(host string, store Storage) *WSServer {
 	return &WSServer{
-		HOST:              host,
-		Storage:           store,
-		WebsocketUpgrader: &WebsocketUpgrader{},
-		Proxy:             NewProxyHandler(),
+		HOST:     host,
+		Storage:  store,
+		Upgrader: &WebsocketUpgrader{host},
+		Proxy:    NewProxyHandler(),
 	}
 }
 
 type WSServer struct {
 	HOST string
 	Storage
-	*WebsocketUpgrader
+	Upgrader
 	Proxy http.Handler
 }
 
@@ -151,12 +151,6 @@ func (sm *WSServer) IndexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (sm *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	isProxy := r.Header.Get("Proxy-Connection") != "" || r.Header.Get("Proxy-Authorization") != ""
-	if isProxy && os.Getenv("CONNECT") != "" {
-		sm.ConnectHandler(w, r)
-		return
-	}
-
 	if sm.IsUpgrade(r) {
 		tssn, tstm, err := sm.Upgrade(w, r)
 		if err != nil {
@@ -171,63 +165,44 @@ func (sm *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		values := r.URL.Query()
-		sm.Add(key, tssn, tstm, values)
+		sm.Add(key, tssn, tstm, r)
 
 		return
 	}
+
+	isProxy := r.Header.Get("Proxy-Connection") != "" || r.Header.Get("Proxy-Authorization") != ""
+	if isProxy && os.Getenv("CONNECT") != "" {
+		sm.ConnectHandler(w, r)
+		return
+	}
+
 	// for HTTP_PROXY r.Method = GET && r.Host = google.com
 	// for HTTPs_PROXY r.Method = GET && r.Host = google.com:443
 	// they are currently not supported and will be handled by the 404 handler
-	if sm.IsIndex(r) {
+	if sm.IsRoot(r) {
 		sm.IndexHandler(w, r)
 		return
 	}
 
-	tssn, ok := sm.Get(r.Host)
-	if !ok {
-		utils.HostNotFoundHandler().ServeHTTP(w, r)
-		return
-	}
-
-	sm.Visited(r.Host)
-
-	rw := func(req *httputil.ProxyRequest) {
-		req.SetXForwarded()
-
-		req.Out.URL.Host = r.Host
-		// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
-		// However, reverseproxy doesn't support webtransport yet
-		// so setting this field currently doesn't have any effect
-		req.Out.URL.Scheme = "http"
-	}
-	tr := &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			expvars.WebteleportRelayStreamsSpawned.Add(1)
-			stm, err := tssn.OpenStream(ctx)
-			return stm, err
-		},
-		MaxIdleConns:    100,
-		IdleConnTimeout: 90 * time.Second,
-	}
-	rp := &httputil.ReverseProxy{
-		Rewrite:   rw,
-		Transport: tr,
-	}
-	rp.ServeHTTP(w, r)
-	expvars.WebteleportRelayStreamsClosed.Add(1)
+	sm.Storage.ServeHTTP(w, r)
 }
 
-func (sm *WSServer) IsIndex(r *http.Request) (result bool) {
+type WebsocketUpgrader struct {
+	root string
+}
+
+func (s *WebsocketUpgrader) Root() string {
+	return s.root
+}
+
+func (s *WebsocketUpgrader) IsRoot(r *http.Request) (result bool) {
 	origin, _, _ := strings.Cut(r.Host, ":")
-	return origin == sm.HOST
+	return origin == s.Root()
 }
 
-func (sm *WSServer) IsUpgrade(r *http.Request) (result bool) {
-	return r.URL.Query().Get("x-websocket-upgrade") != "" && sm.IsIndex(r)
+func (s *WebsocketUpgrader) IsUpgrade(r *http.Request) (result bool) {
+	return r.URL.Query().Get("x-websocket-upgrade") != "" && s.IsRoot(r)
 }
-
-type WebsocketUpgrader struct{}
 
 func (*WebsocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (tssn transport.Session, tstm transport.Stream, err error) {
 	conn, err := wsconn.Wrconn(w, r)

@@ -2,7 +2,6 @@ package relay
 
 import (
 	"net/http"
-	"net/url"
 
 	"github.com/webteleport/webteleport/transport"
 )
@@ -12,7 +11,7 @@ var _ Storage = (*SessionStore)(nil)
 // / transport agnostic CRUD
 type Storage interface {
 	// Create
-	Add(k string, tssn transport.Session, tstm transport.Stream, vals url.Values)
+	Add(k string, tssn transport.Session, tstm transport.Stream, r *http.Request)
 	// Read
 	Get(k string) (transport.Session, bool)
 	Records() []*Record
@@ -24,21 +23,24 @@ type Storage interface {
 	// Rand
 	Allocate(r *http.Request, root string) (key string, hostnamePath string, err error)
 	Negotiate(r *http.Request, root string, tssn transport.Session, tstm transport.Stream) (key string, err error)
+	// Serve
+	http.Handler
 }
 
-var _ Upgrader = (*Relay)(nil)
-var _ Upgrader = (*WSServer)(nil)
+var _ Upgrader = (*WebsocketUpgrader)(nil)
+var _ Upgrader = (*WebtransportUpgrader)(nil)
 
 type Upgrader interface {
-	IsIndex(r *http.Request) bool
+	Root() string
+	IsRoot(r *http.Request) bool
 	IsUpgrade(r *http.Request) bool
 	Upgrade(w http.ResponseWriter, r *http.Request) (transport.Session, transport.Stream, error)
 }
 
-var _ IRelay = (*Relay)(nil)
-var _ IRelay = (*WSServer)(nil)
+var _ Relayer = (*WSServer)(nil)
+var _ Relayer = (*WTServer)(nil)
 
-type IRelay interface {
+type Relayer interface {
 	Upgrader
 	Storage
 	http.Handler

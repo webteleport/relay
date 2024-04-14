@@ -2,11 +2,13 @@ package relay
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
-	"net/url"
+	"net/http/httputil"
 	"sort"
 	"strings"
 	"sync"
@@ -92,12 +94,12 @@ func (sm *SessionStore) Get(k string) (transport.Session, bool) {
 	return nil, false
 }
 
-func (sm *SessionStore) Add(k string, tssn transport.Session, tstm transport.Stream, vals url.Values) {
+func (sm *SessionStore) Add(k string, tssn transport.Session, tstm transport.Stream, r *http.Request) {
 	k, _ = idna.ToASCII(k)
 	sm.Lock.Lock()
 
 	since := time.Now()
-	tags := tags.Tags{Values: vals}
+	tags := tags.Tags{Values: r.URL.Query()}
 	rec := &Record{
 		Session: tssn,
 		Tags:    tags,
@@ -197,4 +199,39 @@ func (sm *SessionStore) Negotiate(r *http.Request, root string, tssn transport.S
 		}
 	}
 	return key, nil
+}
+
+func (sm *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	tssn, ok := sm.Get(r.Host)
+	if !ok {
+		utils.HostNotFoundHandler().ServeHTTP(w, r)
+		return
+	}
+
+	sm.Visited(r.Host)
+
+	rw := func(req *httputil.ProxyRequest) {
+		req.SetXForwarded()
+
+		req.Out.URL.Host = r.Host
+		// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
+		// However, reverseproxy doesn't support webtransport yet
+		// so setting this field currently doesn't have any effect
+		req.Out.URL.Scheme = "http"
+	}
+	tr := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			expvars.WebteleportRelayStreamsSpawned.Add(1)
+			stm, err := tssn.OpenStream(ctx)
+			return stm, err
+		},
+		MaxIdleConns:    100,
+		IdleConnTimeout: 90 * time.Second,
+	}
+	rp := &httputil.ReverseProxy{
+		Rewrite:   rw,
+		Transport: tr,
+	}
+	rp.ServeHTTP(w, r)
+	expvars.WebteleportRelayStreamsClosed.Add(1)
 }
