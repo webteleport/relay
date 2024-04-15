@@ -43,7 +43,7 @@ func (*WebsocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (tssn 
 		w.WriteHeader(500)
 		return
 	}
-	tssn = &websocket.WebsocketSession{ssn}
+	tssn = &websocket.WebsocketSession{Session: ssn}
 	tstm, err = tssn.OpenStream(context.Background())
 	if err != nil {
 		slog.Warn(fmt.Sprintf("websocket stm0 init failed: %s", err))
