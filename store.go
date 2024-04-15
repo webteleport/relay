@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -37,9 +38,11 @@ type SessionStore struct {
 type Record struct {
 	Key     string            `json:"key"`
 	Session transport.Session `json:"-"`
+	Header  tags.Tags         `json:"header"`
 	Tags    tags.Tags         `json:"tags"`
 	Since   time.Time         `json:"since"`
 	Visited int               `json:"visited"`
+	IP      string            `json:"ip"`
 }
 
 func (s *SessionStore) Records() (all []*Record) {
@@ -96,13 +99,16 @@ func (s *SessionStore) Add(k string, tssn transport.Session, tstm transport.Stre
 	s.Lock.Lock()
 
 	since := time.Now()
+	header := tags.Tags{Values: url.Values(r.Header)}
 	tags := tags.Tags{Values: r.URL.Query()}
 	rec := &Record{
 		Session: tssn,
+		Header:  header,
 		Tags:    tags,
 		Since:   since,
 		Visited: 0,
 		Key:     k,
+		IP:      RealIP(r),
 	}
 	s.Record[k] = rec
 
@@ -112,6 +118,22 @@ func (s *SessionStore) Add(k string, tssn transport.Session, tstm transport.Stre
 	go s.Scan(k, tstm)
 
 	expvars.WebteleportRelaySessionsAccepted.Add(1)
+}
+
+func RealIP(r *http.Request) (realIP string) {
+	// Retrieve the client IP address from the request headers
+	for _, x := range []string{
+		r.Header.Get("X-Envoy-External-Address"),
+		r.Header.Get("X-Real-IP"),
+		r.Header.Get("X-Forwarded-For"),
+		r.RemoteAddr,
+	} {
+		if x != "" {
+			realIP = x
+			break
+		}
+	}
+	return
 }
 
 func (s *SessionStore) Ping(k string, tstm transport.Stream) {
