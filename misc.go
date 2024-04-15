@@ -1,16 +1,13 @@
 package relay
 
 import (
-	"context"
 	"expvar"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/webteleport/utils"
 )
@@ -49,19 +46,9 @@ func (sm *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 		req.Out.Header.Set("Proxy-Connection", proxyConnection)
 		req.Out.Header.Set("Proxy-Authorization", proxyAuthorization)
 	}
-	tr := &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			expvars.WebteleportRelayStreamsSpawned.Add(1)
-			stm, err := tssn.OpenStream(ctx)
-			return stm, err
-		},
-		MaxIdleConns:       100,
-		IdleConnTimeout:    90 * time.Second,
-		DisableCompression: true,
-	}
 	rp := &httputil.ReverseProxy{
 		Rewrite:   rw,
-		Transport: tr,
+		Transport: Transport(tssn),
 	}
 	println("proxy::open")
 	// TODO: proxy request will stuck here
@@ -113,18 +100,9 @@ func (sm *WSServer) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		// so setting this field currently doesn't have any effect
 		req.Out.URL.Scheme = "http"
 	}
-	tr := &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			expvars.WebteleportRelayStreamsSpawned.Add(1)
-			stm, err := tssn.OpenStream(ctx)
-			return stm, err
-		},
-		MaxIdleConns:    100,
-		IdleConnTimeout: 90 * time.Second,
-	}
 	rp := &httputil.ReverseProxy{
 		Rewrite:   rw,
-		Transport: tr,
+		Transport: Transport(tssn),
 	}
 	http.StripPrefix("/"+rpath, rp).ServeHTTP(w, r)
 	expvars.WebteleportRelayStreamsClosed.Add(1)

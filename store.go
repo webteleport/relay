@@ -2,11 +2,9 @@ package relay
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"sort"
@@ -218,18 +216,9 @@ func (s *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// so setting this field currently doesn't have any effect
 		req.Out.URL.Scheme = "http"
 	}
-	tr := &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			expvars.WebteleportRelayStreamsSpawned.Add(1)
-			stm, err := tssn.OpenStream(ctx)
-			return stm, err
-		},
-		MaxIdleConns:    100,
-		IdleConnTimeout: 90 * time.Second,
-	}
 	rp := &httputil.ReverseProxy{
 		Rewrite:   rw,
-		Transport: tr,
+		Transport: Transport(tssn),
 	}
 	rp.ServeHTTP(w, r)
 	expvars.WebteleportRelayStreamsClosed.Add(1)
