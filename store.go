@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -129,7 +130,9 @@ func (s *SessionStore) Upsert(k string, tssn transport.Session, tstm transport.S
 	}
 	s.Lock.Unlock()
 
-	go s.Ping(tssn, tstm)
+	if os.Getenv("PING") != "" {
+		go s.Ping(tssn, tstm)
+	}
 	go s.Scan(tssn, tstm)
 
 	expvars.WebteleportRelaySessionsAccepted.Add(1)
