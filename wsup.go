@@ -31,7 +31,8 @@ func (s *WebsocketUpgrader) IsUpgrade(r *http.Request) (result bool) {
 	return r.URL.Query().Get("x-websocket-upgrade") != "" && s.IsRoot(r)
 }
 
-func YamuxReverseGender(conn io.ReadWriteCloser, config *yamux.Config, r *http.Request) (string, *yamux.Session, error) {
+func YamuxReverseGender(conn io.ReadWriteCloser, r *http.Request) (string, *yamux.Session, error) {
+	config := websocket.YamuxConfig()
 	// for compatibility with old clients
 	// by default, assume opposite side is client
 	// TODO over time, we will drop this compatibility
@@ -52,8 +53,7 @@ func (*WebsocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (tssn 
 		w.WriteHeader(500)
 		return
 	}
-	config := websocket.YamuxConfig(io.Discard)
-	gender, ssn, err := YamuxReverseGender(conn, config, r)
+	gender, ssn, err := YamuxReverseGender(conn, r)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("websocket creating yamux %s failed: %s", gender, err))
 		w.WriteHeader(500)
