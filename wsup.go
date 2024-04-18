@@ -52,7 +52,7 @@ func (*WebsocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (tssn 
 		w.WriteHeader(500)
 		return
 	}
-	config := YamuxConfig(io.Discard)
+	config := websocket.YamuxConfig(io.Discard)
 	gender, ssn, err := YamuxReverseGender(conn, config, r)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("websocket creating yamux %s failed: %s", gender, err))
