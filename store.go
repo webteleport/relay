@@ -73,16 +73,25 @@ func (s *SessionStore) Visited(k string) {
 	s.Lock.Unlock()
 }
 
-func (s *SessionStore) Remove(k string) {
+func (s *SessionStore) RemoveSession(tssn transport.Session) {
 	s.Lock.Lock()
-	delete(s.Record, k)
+	for k, rec := range s.Record {
+		if rec.Session == tssn {
+			delete(s.Record, k)
+			slog.Info(fmt.Sprintf("Removed %s", k))
+			break
+		}
+	}
 	s.Lock.Unlock()
-	emsg := fmt.Sprintf("Recycled %s", k)
-	slog.Info(emsg)
 	expvars.WebteleportRelaySessionsClosed.Add(1)
 }
 
-func (s *SessionStore) Get(k string) (transport.Session, bool) {
+func (s *SessionStore) Has(k string) bool {
+	_, ok := s.GetSession(k)
+	return ok
+}
+
+func (s *SessionStore) GetSession(k string) (transport.Session, bool) {
 	k, _ = idna.ToASCII(k)
 	host, _, _ := strings.Cut(k, ":")
 	s.Lock.RLock()
@@ -94,9 +103,8 @@ func (s *SessionStore) Get(k string) (transport.Session, bool) {
 	return nil, false
 }
 
-func (s *SessionStore) Add(k string, tssn transport.Session, tstm transport.Stream, r *http.Request) {
+func (s *SessionStore) Upsert(k string, tssn transport.Session, tstm transport.Stream, r *http.Request) {
 	k, _ = idna.ToASCII(k)
-	s.Lock.Lock()
 
 	since := time.Now()
 	header := tags.Tags{Values: url.Values(r.Header)}
@@ -110,12 +118,19 @@ func (s *SessionStore) Add(k string, tssn transport.Session, tstm transport.Stre
 		Key:     k,
 		IP:      RealIP(r),
 	}
-	s.Record[k] = rec
 
+	s.Lock.Lock()
+	if s.Has(k) {
+		s.Record[k] = rec
+		slog.Info(fmt.Sprintf("Updated %s", k))
+	} else {
+		s.Record[k] = rec
+		slog.Info(fmt.Sprintf("Inserted %s", k))
+	}
 	s.Lock.Unlock()
 
-	go s.Ping(k, tstm)
-	go s.Scan(k, tstm)
+	go s.Ping(tssn, tstm)
+	go s.Scan(tssn, tstm)
 
 	expvars.WebteleportRelaySessionsAccepted.Add(1)
 }
@@ -136,7 +151,7 @@ func RealIP(r *http.Request) (realIP string) {
 	return
 }
 
-func (s *SessionStore) Ping(k string, tstm transport.Stream) {
+func (s *SessionStore) Ping(tssn transport.Session, tstm transport.Stream) {
 	for {
 		time.Sleep(s.PingInterval)
 		_, err := io.WriteString(tstm, fmt.Sprintf("%s\n", "PING"))
@@ -144,10 +159,10 @@ func (s *SessionStore) Ping(k string, tstm transport.Stream) {
 			break
 		}
 	}
-	s.Remove(k)
+	s.RemoveSession(tssn)
 }
 
-func (s *SessionStore) Scan(k string, tstm transport.Stream) {
+func (s *SessionStore) Scan(tssn transport.Session, tstm transport.Stream) {
 	scanner := bufio.NewScanner(tstm)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -158,7 +173,7 @@ func (s *SessionStore) Scan(k string, tstm transport.Stream) {
 		}
 		if line == "CLOSE" {
 			// close session immediately
-			s.Remove(k)
+			s.RemoveSession(tssn)
 			break
 		}
 		slog.Warn(fmt.Sprintf("stm0: unknown command: %s", line))
@@ -221,7 +236,7 @@ func (s *SessionStore) Negotiate(r *http.Request, root string, tssn transport.Se
 }
 
 func (s *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	tssn, ok := s.Get(r.Host)
+	tssn, ok := s.GetSession(r.Host)
 	if !ok {
 		utils.HostNotFoundHandler().ServeHTTP(w, r)
 		return

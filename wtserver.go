@@ -67,7 +67,7 @@ func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		s.Add(key, tssn, tstm, r)
+		s.Upsert(key, tssn, tstm, r)
 
 		return
 	}

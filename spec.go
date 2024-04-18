@@ -10,16 +10,21 @@ var _ Storage = (*SessionStore)(nil)
 
 // / transport agnostic CRUD
 type Storage interface {
-	// Create
-	Add(k string, tssn transport.Session, tstm transport.Stream, r *http.Request)
+	// Upsert
+	Upsert(k string, tssn transport.Session, tstm transport.Stream, r *http.Request)
 	// Read
-	Get(k string) (transport.Session, bool)
+	Has(k string) bool
+	GetSession(k string) (transport.Session, bool)
 	Records() []*Record
 	RecordsHandler(w http.ResponseWriter, r *http.Request)
 	// Update
 	Visited(k string)
-	// Remove
-	Remove(k string)
+	// Remove Session
+	// if session is already removed, subsequent calls will be no-op
+	// NOTE: the signature is not Remove(k string) because the key doesn't
+	// uniquely identify the session. If a new session is created with the same key,
+	// it should not be removed by the previous call
+	RemoveSession(tssn transport.Session)
 	// Rand
 	Allocate(r *http.Request, root string) (key string, hostnamePath string, err error)
 	Negotiate(r *http.Request, root string, tssn transport.Session, tstm transport.Stream) (key string, err error)

@@ -12,21 +12,21 @@ import (
 	"github.com/webteleport/utils"
 )
 
-func (sm *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
+func (s *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("NAIVE") == "" || r.Header.Get("Naive") == "" {
-		sm.Proxy.ServeHTTP(w, r)
+		s.Proxy.ServeHTTP(w, r)
 		return
 	}
 
 	rhost, pw, okk := ProxyBasicAuth(r)
-	tssn, ok := sm.Get(rhost)
+	tssn, ok := s.GetSession(rhost)
 	if !ok {
 		slog.Warn(fmt.Sprintln("Proxy agent not found:", rhost, pw, okk))
 		DefaultIndex().ServeHTTP(w, r)
 		return
 	}
 
-	sm.Visited(rhost)
+	s.Visited(rhost)
 
 	if r.Header.Get("Host") == "" {
 		r.Header.Set("Host", r.URL.Host)
@@ -70,26 +70,26 @@ func leadingComponent(s string) string {
 	return strings.Split(strings.TrimPrefix(s, "/"), "/")[0]
 }
 
-func (sm *WSServer) IndexHandler(w http.ResponseWriter, r *http.Request) {
+func (s *WSServer) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	if dbgvars := os.Getenv("DEBUG_VARS_PATH"); dbgvars != "" && r.URL.Path == dbgvars {
 		expvar.Handler().ServeHTTP(w, r)
 		return
 	}
 
 	if apisess := os.Getenv("API_SESSIONS_PATH"); apisess != "" && r.URL.Path == apisess {
-		sm.RecordsHandler(w, r)
+		s.RecordsHandler(w, r)
 		return
 	}
 
 	rpath := leadingComponent(r.URL.Path)
-	rhost := fmt.Sprintf("%s.%s", rpath, sm.HOST)
-	tssn, ok := sm.Get(rhost)
+	rhost := fmt.Sprintf("%s.%s", rpath, s.HOST)
+	tssn, ok := s.GetSession(rhost)
 	if !ok {
 		DefaultIndex().ServeHTTP(w, r)
 		return
 	}
 
-	sm.Visited(rhost)
+	s.Visited(rhost)
 
 	rw := func(req *httputil.ProxyRequest) {
 		req.SetXForwarded()
