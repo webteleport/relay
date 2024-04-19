@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	wt "github.com/quic-go/webtransport-go"
 	"github.com/webteleport/webteleport/transport"
@@ -22,8 +21,7 @@ func (s *WebtransportUpgrader) Root() string {
 }
 
 func (s *WebtransportUpgrader) IsRoot(r *http.Request) (result bool) {
-	origin, _, _ := strings.Cut(r.Host, ":")
-	return origin == s.Root()
+	return r.Host == s.Root()
 }
 
 func (s *WebtransportUpgrader) IsUpgrade(r *http.Request) (result bool) {

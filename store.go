@@ -26,6 +26,7 @@ func NewSessionStore() *SessionStore {
 	return &SessionStore{
 		Lock:         &sync.RWMutex{},
 		PingInterval: time.Second * 5,
+		Verbose:      os.Getenv("VERBOSE") != "",
 		Record:       map[string]*Record{},
 	}
 }
@@ -33,6 +34,7 @@ func NewSessionStore() *SessionStore {
 type SessionStore struct {
 	Lock         *sync.RWMutex
 	PingInterval time.Duration
+	Verbose      bool
 	Record       map[string]*Record
 }
 
@@ -47,7 +49,9 @@ type Record struct {
 }
 
 func (s *SessionStore) Records() (all []*Record) {
+	s.Lock.RLock()
 	all = maps.Values(s.Record)
+	s.Lock.RUnlock()
 	sort.Slice(all, func(i, j int) bool {
 		return all[i].Since.After(all[j].Since)
 	})
@@ -66,6 +70,8 @@ func (s *SessionStore) RecordsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SessionStore) Visited(k string) {
+	k = StripPort(k)
+	k, _ = idna.ToASCII(k)
 	s.Lock.Lock()
 	rec, ok := s.Record[k]
 	if ok {
@@ -79,7 +85,9 @@ func (s *SessionStore) RemoveSession(tssn transport.Session) {
 	for k, rec := range s.Record {
 		if rec.Session == tssn {
 			delete(s.Record, k)
-			slog.Info(fmt.Sprintf("Removed %s", k))
+			if s.Verbose {
+				slog.Info("Remove", "key", k)
+			}
 			break
 		}
 	}
@@ -87,16 +95,11 @@ func (s *SessionStore) RemoveSession(tssn transport.Session) {
 	expvars.WebteleportRelaySessionsClosed.Add(1)
 }
 
-func (s *SessionStore) Has(k string) bool {
-	_, ok := s.GetSession(k)
-	return ok
-}
-
 func (s *SessionStore) GetSession(k string) (transport.Session, bool) {
+	k = StripPort(k)
 	k, _ = idna.ToASCII(k)
-	host, _, _ := strings.Cut(k, ":")
 	s.Lock.RLock()
-	rec, ok := s.Record[host]
+	rec, ok := s.Record[k]
 	s.Lock.RUnlock()
 	if ok {
 		return rec.Session, true
@@ -105,6 +108,7 @@ func (s *SessionStore) GetSession(k string) (transport.Session, bool) {
 }
 
 func (s *SessionStore) Upsert(k string, tssn transport.Session, tstm transport.Stream, r *http.Request) {
+	k = StripPort(k)
 	k, _ = idna.ToASCII(k)
 
 	since := time.Now()
@@ -119,17 +123,19 @@ func (s *SessionStore) Upsert(k string, tssn transport.Session, tstm transport.S
 		Key:     k,
 		IP:      RealIP(r),
 	}
-	has := s.Has(k) // has to be called before the lock
 
 	s.Lock.Lock()
-	if has {
-		s.Record[k] = rec
-		slog.Info(fmt.Sprintf("Updated %s", k))
-	} else {
-		s.Record[k] = rec
-		slog.Info(fmt.Sprintf("Inserted %s", k))
-	}
+	_, has := s.Record[k]
+	s.Record[k] = rec
 	s.Lock.Unlock()
+
+	if s.Verbose {
+		if has {
+			slog.Info("Update", "key", k, "ip", rec.IP)
+		} else {
+			slog.Info("Insert", "key", k, "ip", rec.IP)
+		}
+	}
 
 	if os.Getenv("PING") != "" {
 		go s.Ping(tssn, tstm)
@@ -198,7 +204,9 @@ func (s *SessionStore) Allocate(r *http.Request, root string) (string, string, e
 		// Try to lease the first available subdomain if candidates are provided
 		for _, pfx := range candidates {
 			k := fmt.Sprintf("%s.%s", pfx, root)
+			s.Lock.RLock()
 			rec, exist := s.Record[k]
+			s.Lock.RUnlock()
 			if !exist || (clobber != "" && rec.Tags.Get("clobber") == clobber) {
 				sub = pfx
 				break
@@ -248,7 +256,8 @@ func (s *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	s.Visited(r.Host)
 
-	rw := func(req *httputil.ProxyRequest) {
+	rp := ReverseProxy(tssn)
+	rp.Rewrite = func(req *httputil.ProxyRequest) {
 		req.SetXForwarded()
 
 		req.Out.URL.Host = r.Host
@@ -256,10 +265,6 @@ func (s *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// However, reverseproxy doesn't support webtransport yet
 		// so setting this field currently doesn't have any effect
 		req.Out.URL.Scheme = "http"
-	}
-	rp := &httputil.ReverseProxy{
-		Rewrite:   rw,
-		Transport: Transport(tssn),
 	}
 	rp.ServeHTTP(w, r)
 	expvars.WebteleportRelayStreamsClosed.Add(1)

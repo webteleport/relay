@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/btwiuse/wsconn"
 	"github.com/webteleport/webteleport/transport"
@@ -21,8 +20,7 @@ func (s *WebsocketUpgrader) Root() string {
 }
 
 func (s *WebsocketUpgrader) IsRoot(r *http.Request) (result bool) {
-	origin, _, _ := strings.Cut(r.Host, ":")
-	return origin == s.Root()
+	return r.Host == s.Root()
 }
 
 func (s *WebsocketUpgrader) IsUpgrade(r *http.Request) (result bool) {

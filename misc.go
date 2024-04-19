@@ -4,6 +4,7 @@ import (
 	"expvar"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"os"
@@ -35,7 +36,8 @@ func (s *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	proxyConnection := r.Header.Get("Proxy-Connection")
 	proxyAuthorization := r.Header.Get("Proxy-Authorization")
 
-	rw := func(req *httputil.ProxyRequest) {
+	rp := ReverseProxy(tssn)
+	rp.Rewrite = func(req *httputil.ProxyRequest) {
 		req.SetXForwarded()
 
 		req.Out.URL.Host = r.Host
@@ -45,10 +47,6 @@ func (s *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 		req.Out.URL.Scheme = "http"
 		req.Out.Header.Set("Proxy-Connection", proxyConnection)
 		req.Out.Header.Set("Proxy-Authorization", proxyAuthorization)
-	}
-	rp := &httputil.ReverseProxy{
-		Rewrite:   rw,
-		Transport: Transport(tssn),
 	}
 	println("proxy::open")
 	// TODO: proxy request will stuck here
@@ -91,7 +89,8 @@ func (s *WSServer) IndexHandler(w http.ResponseWriter, r *http.Request) {
 
 	s.Visited(rhost)
 
-	rw := func(req *httputil.ProxyRequest) {
+	rp := ReverseProxy(tssn)
+	rp.Rewrite = func(req *httputil.ProxyRequest) {
 		req.SetXForwarded()
 
 		req.Out.URL.Host = r.Host
@@ -100,10 +99,13 @@ func (s *WSServer) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		// so setting this field currently doesn't have any effect
 		req.Out.URL.Scheme = "http"
 	}
-	rp := &httputil.ReverseProxy{
-		Rewrite:   rw,
-		Transport: Transport(tssn),
-	}
 	http.StripPrefix("/"+rpath, rp).ServeHTTP(w, r)
 	expvars.WebteleportRelayStreamsClosed.Add(1)
+}
+
+func StripPort(hostport string) string {
+	// use net.SplitHostPort instead of strings.Split
+	// because it can handle ipv6 addresses
+	host, _, _ := net.SplitHostPort(hostport)
+	return host
 }

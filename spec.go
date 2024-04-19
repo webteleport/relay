@@ -13,7 +13,6 @@ type Storage interface {
 	// Upsert
 	Upsert(k string, tssn transport.Session, tstm transport.Stream, r *http.Request)
 	// Read
-	Has(k string) bool
 	GetSession(k string) (transport.Session, bool)
 	Records() []*Record
 	RecordsHandler(w http.ResponseWriter, r *http.Request)
