@@ -106,6 +106,10 @@ func (s *WSServer) IndexHandler(w http.ResponseWriter, r *http.Request) {
 func StripPort(hostport string) string {
 	// use net.SplitHostPort instead of strings.Split
 	// because it can handle ipv6 addresses
-	host, _, _ := net.SplitHostPort(hostport)
+	host, _, err := net.SplitHostPort(hostport)
+	if err != nil {
+		// if there is no port, just return the input
+		return hostport
+	}
 	return host
 }
