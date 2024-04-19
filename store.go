@@ -195,6 +195,7 @@ func (s *SessionStore) Allocate(r *http.Request, root string) (string, string, e
 		candidates = utils.ParseDomainCandidates(r.URL.Path)
 		Values     = r.URL.Query()
 		clobber    = Values.Get("clobber")
+		ip         = RealIP(r)
 	)
 
 	sub := ""
@@ -207,14 +208,19 @@ func (s *SessionStore) Allocate(r *http.Request, root string) (string, string, e
 			s.Lock.RLock()
 			rec, exist := s.Record[k]
 			s.Lock.RUnlock()
-			if !exist || (clobber != "" && rec.Tags.Get("clobber") == clobber) {
+
+			insert := !exist
+			updateByIP := exist && clobber == "" && rec.IP == ip
+			updateByClobber := exist && clobber != "" && rec.Tags.Get("clobber") == clobber
+
+			if upsert := insert || updateByIP || updateByClobber; upsert {
 				sub = pfx
 				break
 			}
 		}
 	}
 	if sub == "" {
-		err := fmt.Errorf("none of your requested subdomains are currently available: %v", candidates)
+		err := fmt.Errorf("none available: %v", candidates)
 		return "", "", err
 	}
 
