@@ -3,13 +3,11 @@ package relay
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/btwiuse/wsconn"
-	"github.com/hashicorp/yamux"
 	"github.com/webteleport/webteleport/transport"
 	"github.com/webteleport/webteleport/transport/websocket"
 )
@@ -31,21 +29,6 @@ func (s *WebsocketUpgrader) IsUpgrade(r *http.Request) (result bool) {
 	return r.URL.Query().Get("x-websocket-upgrade") != "" && s.IsRoot(r)
 }
 
-func YamuxReverseGender(conn io.ReadWriteCloser, r *http.Request) (string, *yamux.Session, error) {
-	config := websocket.YamuxConfig()
-	// for compatibility with old clients
-	// by default, assume opposite side is client
-	// TODO over time, we will drop this compatibility
-	// and assume opposite side is always server
-	if r.Header.Get("Yamux") == "" && r.URL.Query().Get("yamux") == "" {
-		ssn, err := yamux.Server(conn, config)
-		return "server", ssn, err
-	}
-	// default gender of new clients is server
-	ssn, err := yamux.Client(conn, config)
-	return "client", ssn, err
-}
-
 func (*WebsocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (tssn transport.Session, tstm transport.Stream, err error) {
 	conn, err := wsconn.Wrconn(w, r)
 	if err != nil {
@@ -53,7 +36,7 @@ func (*WebsocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (tssn 
 		w.WriteHeader(500)
 		return
 	}
-	gender, ssn, err := YamuxReverseGender(conn, r)
+	gender, ssn, err := websocket.YamuxReverseGender(conn, r)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("websocket creating yamux %s failed: %s", gender, err))
 		w.WriteHeader(500)

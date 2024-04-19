@@ -119,9 +119,10 @@ func (s *SessionStore) Upsert(k string, tssn transport.Session, tstm transport.S
 		Key:     k,
 		IP:      RealIP(r),
 	}
+	has := s.Has(k) // has to be called before the lock
 
 	s.Lock.Lock()
-	if s.Has(k) {
+	if has {
 		s.Record[k] = rec
 		slog.Info(fmt.Sprintf("Updated %s", k))
 	} else {
