@@ -4,7 +4,6 @@ import (
 	"expvar"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"os"
@@ -101,15 +100,4 @@ func (s *WSServer) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	http.StripPrefix("/"+rpath, rp).ServeHTTP(w, r)
 	expvars.WebteleportRelayStreamsClosed.Add(1)
-}
-
-func StripPort(hostport string) string {
-	// use net.SplitHostPort instead of strings.Split
-	// because it can handle ipv6 addresses
-	host, _, err := net.SplitHostPort(hostport)
-	if err != nil {
-		// if there is no port, just return the input
-		return hostport
-	}
-	return host
 }

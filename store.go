@@ -70,7 +70,7 @@ func (s *SessionStore) RecordsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SessionStore) Visited(k string) {
-	k = StripPort(k)
+	k = utils.StripPort(k)
 	k, _ = idna.ToASCII(k)
 	s.Lock.Lock()
 	rec, ok := s.Record[k]
@@ -96,7 +96,7 @@ func (s *SessionStore) RemoveSession(tssn transport.Session) {
 }
 
 func (s *SessionStore) GetSession(k string) (transport.Session, bool) {
-	k = StripPort(k)
+	k = utils.StripPort(k)
 	k, _ = idna.ToASCII(k)
 	s.Lock.RLock()
 	rec, ok := s.Record[k]
@@ -108,7 +108,7 @@ func (s *SessionStore) GetSession(k string) (transport.Session, bool) {
 }
 
 func (s *SessionStore) Upsert(k string, tssn transport.Session, tstm transport.Stream, r *http.Request) {
-	k = StripPort(k)
+	k = utils.StripPort(k)
 	k, _ = idna.ToASCII(k)
 
 	since := time.Now()
@@ -121,7 +121,7 @@ func (s *SessionStore) Upsert(k string, tssn transport.Session, tstm transport.S
 		Since:   since,
 		Visited: 0,
 		Key:     k,
-		IP:      RealIP(r),
+		IP:      utils.RealIP(r),
 	}
 
 	s.Lock.Lock()
@@ -145,22 +145,11 @@ func (s *SessionStore) Upsert(k string, tssn transport.Session, tstm transport.S
 	expvars.WebteleportRelaySessionsAccepted.Add(1)
 }
 
-func RealIP(r *http.Request) (realIP string) {
-	// Retrieve the client IP address from the request headers
-	for _, x := range []string{
-		r.Header.Get("X-Envoy-External-Address"),
-		r.Header.Get("X-Real-IP"),
-		r.Header.Get("X-Forwarded-For"),
-		r.RemoteAddr,
-	} {
-		if x != "" {
-			realIP = x
-			break
-		}
-	}
-	return
-}
-
+// Ping proactively pings the client to keep the connection alive and to detect if the client has disconnected.
+// If the client has disconnected, the session is removed from the session store.
+//
+// This function has been found mostly unnecessary since the disconnect is automatically detected by the
+// underlying transport layer and handled by the Scan function. However, it is kept here for completeness.
 func (s *SessionStore) Ping(tssn transport.Session, tstm transport.Stream) {
 	for {
 		time.Sleep(s.PingInterval)
@@ -195,7 +184,7 @@ func (s *SessionStore) Allocate(r *http.Request, root string) (string, string, e
 		candidates = utils.ParseDomainCandidates(r.URL.Path)
 		Values     = r.URL.Query()
 		clobber    = Values.Get("clobber")
-		ip         = RealIP(r)
+		ip         = utils.RealIP(r)
 	)
 
 	sub := ""

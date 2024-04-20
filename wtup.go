@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	wt "github.com/quic-go/webtransport-go"
+	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/transport"
 	"github.com/webteleport/webteleport/transport/webtransport"
 )
@@ -21,7 +22,7 @@ func (s *WebtransportUpgrader) Root() string {
 }
 
 func (s *WebtransportUpgrader) IsRoot(r *http.Request) (result bool) {
-	return r.Host == s.Root()
+	return utils.StripPort(r.Host) == utils.StripPort(s.Root())
 }
 
 func (s *WebtransportUpgrader) IsUpgrade(r *http.Request) (result bool) {
