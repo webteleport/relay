@@ -164,7 +164,7 @@ func RealIP(r *http.Request) (realIP string) {
 func (s *SessionStore) Ping(tssn transport.Session, tstm transport.Stream) {
 	for {
 		time.Sleep(s.PingInterval)
-		_, err := io.WriteString(tstm, fmt.Sprintf("%s\n", "PING"))
+		_, err := io.WriteString(tstm, "\n")
 		if err != nil {
 			break
 		}
@@ -176,18 +176,18 @@ func (s *SessionStore) Scan(tssn transport.Session, tstm transport.Stream) {
 	scanner := bufio.NewScanner(tstm)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if line == "PONG" {
+		if line == "" || line == "PONG" {
 			// currently client reply nothing to server PING's
 			// so this is a noop
 			continue
 		}
 		if line == "CLOSE" {
 			// close session immediately
-			s.RemoveSession(tssn)
 			break
 		}
 		slog.Warn(fmt.Sprintf("stm0: unknown command: %s", line))
 	}
+	s.RemoveSession(tssn)
 }
 
 func (s *SessionStore) Allocate(r *http.Request, root string) (string, string, error) {
