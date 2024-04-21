@@ -38,7 +38,7 @@ func (s *WebtransportUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (
 	}
 
 	tssn := &webtransport.WebtransportSession{Session: ssn}
-	tstm, err := tssn.OpenStream(context.Background())
+	tstm, err := tssn.Open(context.Background())
 	if err != nil {
 		slog.Warn(fmt.Sprintf("webtransport stm0 init failed: %s", err))
 		return nil, nil, err

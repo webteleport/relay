@@ -15,7 +15,7 @@ func Transport(tssn transport.Session) *http.Transport {
 	return &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			expvars.WebteleportRelayStreamsSpawned.Add(1)
-			stm, err := tssn.OpenStream(ctx)
+			stm, err := tssn.Open(ctx)
 			return stm, err
 		},
 		MaxIdleConns:    100,
