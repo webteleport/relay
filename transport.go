@@ -11,13 +11,14 @@ import (
 	"github.com/webteleport/webteleport/transport"
 )
 
-func Transport(tssn transport.Session) *http.Transport {
+func RoundTripper(tssn transport.Session) http.RoundTripper {
+	dialCtx := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		expvars.WebteleportRelayStreamsSpawned.Add(1)
+		stm, err := tssn.Open(ctx)
+		return stm, err
+	}
 	return &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			expvars.WebteleportRelayStreamsSpawned.Add(1)
-			stm, err := tssn.Open(ctx)
-			return stm, err
-		},
+		DialContext: 	 dialCtx,
 		MaxIdleConns:    100,
 		IdleConnTimeout: 90 * time.Second,
 	}
@@ -25,7 +26,7 @@ func Transport(tssn transport.Session) *http.Transport {
 
 func ReverseProxy(tssn transport.Session) *httputil.ReverseProxy {
 	return &httputil.ReverseProxy{
-		Transport: Transport(tssn),
+		Transport: RoundTripper(tssn),
 		ErrorLog:  utils.ReverseProxyLogger(),
 	}
 }
