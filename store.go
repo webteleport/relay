@@ -9,6 +9,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -48,20 +49,44 @@ type Record struct {
 	IP      string            `json:"ip"`
 }
 
+func (r *Record) Matches(kvs url.Values) (ok bool) {
+	for k, v := range kvs {
+		// r.Tags contains k
+		tv, has := r.Tags.Values[k]
+		if !has {
+			return false
+		}
+		// tv is superset of v
+		for _, vv := range v {
+			if !slices.Contains(tv, vv) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (s *SessionStore) Records() (all []*Record) {
 	s.Lock.RLock()
 	all = maps.Values(s.Record)
 	s.Lock.RUnlock()
-	sort.Slice(all, func(i, j int) bool {
+	lessFunc := func(i, j int) bool {
 		return all[i].Since.After(all[j].Since)
-	})
+	}
+	sort.Slice(all, lessFunc)
 	return
 }
 
 func (s *SessionStore) RecordsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	all := s.Records()
-	resp, err := tags.UnescapedJSONMarshalIndent(all, "  ")
+	filtered := []*Record{}
+	for _, rec := range all {
+		if rec.Matches(r.URL.Query()) {
+			filtered = append(filtered, rec)
+		}
+	}
+	resp, err := tags.UnescapedJSONMarshalIndent(filtered, "  ")
 	if err != nil {
 		slog.Warn(fmt.Sprintf("json marshal failed: %s", err))
 		return

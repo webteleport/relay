@@ -18,7 +18,7 @@ func RoundTripper(tssn transport.Session) http.RoundTripper {
 		return stm, err
 	}
 	return &http.Transport{
-		DialContext: 	 dialCtx,
+		DialContext:     dialCtx,
 		MaxIdleConns:    100,
 		IdleConnTimeout: 90 * time.Second,
 	}
