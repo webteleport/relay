@@ -7,8 +7,8 @@ import (
 	"net/http"
 
 	wt "github.com/quic-go/webtransport-go"
+	"github.com/webteleport/transport"
 	"github.com/webteleport/utils"
-	"github.com/webteleport/webteleport/transport"
 	"github.com/webteleport/webteleport/transport/webtransport"
 )
 

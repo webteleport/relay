@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/btwiuse/wsconn"
-	"github.com/webteleport/webteleport/transport"
+	"github.com/webteleport/transport"
 	"github.com/webteleport/webteleport/transport/websocket"
 )
 

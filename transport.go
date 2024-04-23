@@ -7,8 +7,8 @@ import (
 	"net/http/httputil"
 	"time"
 
+	"github.com/webteleport/transport"
 	"github.com/webteleport/utils"
-	"github.com/webteleport/webteleport/transport"
 )
 
 func RoundTripper(tssn transport.Session) http.RoundTripper {

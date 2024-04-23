@@ -3,7 +3,7 @@ package relay
 import (
 	"net/http"
 
-	"github.com/webteleport/webteleport/transport"
+	"github.com/webteleport/transport"
 )
 
 var _ Storage = (*SessionStore)(nil)
