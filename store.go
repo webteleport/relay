@@ -28,6 +28,8 @@ func NewSessionStore() *SessionStore {
 		Lock:         &sync.RWMutex{},
 		PingInterval: time.Second * 5,
 		Verbose:      os.Getenv("VERBOSE") != "",
+		Webhook:      os.Getenv("WEBHOOK"),
+		Client:       &http.Client{},
 		Record:       map[string]*Record{},
 	}
 }
@@ -36,7 +38,21 @@ type SessionStore struct {
 	Lock         *sync.RWMutex
 	PingInterval time.Duration
 	Verbose      bool
+	Webhook      string
+	Client       *http.Client
 	Record       map[string]*Record
+}
+
+func (s *SessionStore) WebLog(msg string) {
+	if s.Webhook == "" {
+		return
+	}
+	remote := fmt.Sprintf("%s/%s", s.Webhook, msg)
+	req, err := http.NewRequest("LOG", remote, nil)
+	if err != nil {
+		return
+	}
+	go s.Client.Do(req)
 }
 
 type Record struct {
@@ -111,8 +127,9 @@ func (s *SessionStore) RemoveSession(tssn transport.Session) {
 		if rec.Session == tssn {
 			delete(s.Record, k)
 			if s.Verbose {
-				slog.Info("Remove", "key", k)
+				slog.Info("remove", "key", k)
 			}
+			s.WebLog(fmt.Sprintf("remove/%s", k))
 			break
 		}
 	}
@@ -154,13 +171,16 @@ func (s *SessionStore) Upsert(k string, tssn transport.Session, tstm transport.S
 	s.Record[k] = rec
 	s.Lock.Unlock()
 
-	if s.Verbose {
-		if has {
-			slog.Info("Update", "key", k, "ip", rec.IP)
-		} else {
-			slog.Info("Insert", "key", k, "ip", rec.IP)
-		}
+	action := ""
+	if has {
+		action = "update"
+	} else {
+		action = "insert"
 	}
+	if s.Verbose {
+		slog.Info(action, "key", k, "ip", rec.IP)
+	}
+	s.WebLog(fmt.Sprintf("%s/%s?ip=%s", action, k, rec.IP))
 
 	if os.Getenv("PING") != "" {
 		go s.Ping(tssn, tstm)
