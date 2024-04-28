@@ -9,12 +9,38 @@ import (
 	"os"
 	"strings"
 
+	"github.com/btwiuse/connect"
 	"github.com/webteleport/utils"
 )
 
+// when env CONNECT is set, filter authenticated h1/h2/h3 connect requests
+func IsConnect(r *http.Request) bool {
+	if os.Getenv("CONNECT") == "" {
+		return false
+	}
+	if r.Method != http.MethodConnect {
+		return false
+	}
+	return r.Header.Get("Proxy-Authorization") != ""
+}
+
+func NewConnectHandler() http.Handler {
+	if os.Getenv("CONNECT_VERBOSE") != "" {
+		return connectVerbose(connect.Handler)
+	}
+	return connect.Handler
+}
+
+func connectVerbose(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		println(r.Proto, r.Host, r.Header)
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("NAIVE") == "" || r.Header.Get("Naive") == "" {
-		s.Proxy.ServeHTTP(w, r)
+		s.Connect.ServeHTTP(w, r)
 		return
 	}
 
@@ -53,6 +79,13 @@ func (s *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	rp.ServeHTTP(w, r)
 	println("proxy::returned")
 	expvars.WebteleportRelayStreamsClosed.Add(1)
+}
+
+func (s *WTServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("NAIVE") == "" || r.Header.Get("Naive") == "" {
+		s.Connect.ServeHTTP(w, r)
+		return
+	}
 }
 
 func DefaultIndex() http.Handler {

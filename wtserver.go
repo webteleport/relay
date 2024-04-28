@@ -21,6 +21,7 @@ func NewWTServer(host string, store Storage) *WTServer {
 		HOST:                 host,
 		Storage:              store,
 		WebtransportUpgrader: u,
+		Connect:              NewConnectHandler(),
 	}
 	u.Server.H3 = http3.Server{
 		Handler: s,
@@ -49,6 +50,7 @@ type WTServer struct {
 	HOST string
 	Storage
 	*WebtransportUpgrader
+	Connect     http.Handler
 	PostUpgrade http.Handler
 }
 
@@ -69,6 +71,11 @@ func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		s.Upsert(key, tssn, tstm, r)
 
+		return
+	}
+
+	if IsConnect(r) {
+		s.ConnectHandler(w, r)
 		return
 	}
 

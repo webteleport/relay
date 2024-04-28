@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 )
 
 func NewWSServer(host string, store Storage) *WSServer {
@@ -12,7 +11,7 @@ func NewWSServer(host string, store Storage) *WSServer {
 		HOST:     host,
 		Storage:  store,
 		Upgrader: &WebsocketUpgrader{host},
-		Proxy:    NewProxyHandler(),
+		Connect:  NewConnectHandler(),
 	}
 }
 
@@ -25,7 +24,7 @@ type WSServer struct {
 	HOST string
 	Storage
 	Upgrader
-	Proxy       http.Handler
+	Connect     http.Handler
 	PostUpgrade http.Handler
 }
 
@@ -49,8 +48,7 @@ func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isProxy := r.Header.Get("Proxy-Connection") != "" || r.Header.Get("Proxy-Authorization") != ""
-	if isProxy && os.Getenv("CONNECT") != "" {
+	if IsConnect(r) {
 		s.ConnectHandler(w, r)
 		return
 	}

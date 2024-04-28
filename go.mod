@@ -6,6 +6,7 @@ go 1.22.2
 // replace github.com/webteleport/utils => ../utils
 
 require (
+	github.com/btwiuse/connect v0.0.5
 	github.com/btwiuse/rng v0.0.0
 	github.com/btwiuse/tags v0.0.2
 	github.com/btwiuse/wsconn v0.0.1
