@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	wt "github.com/quic-go/webtransport-go"
-	"github.com/webteleport/transport"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/transport/webtransport"
 )
@@ -29,20 +28,27 @@ func (s *WebtransportUpgrader) IsUpgrade(r *http.Request) (result bool) {
 	return r.URL.Query().Get("x-webtransport-upgrade") != "" && s.IsRoot(r)
 }
 
-func (s *WebtransportUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (transport.Session, transport.Stream, error) {
+func (s *WebtransportUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (*Request, error) {
 	ssn, err := s.Server.Upgrade(w, r)
 	if err != nil {
 		slog.Warn(fmt.Sprintf("webtransport upgrade failed: %s", err))
 		w.WriteHeader(500)
-		return nil, nil, err
+		return nil, err
 	}
 
 	tssn := &webtransport.WebtransportSession{Session: ssn}
 	tstm, err := tssn.Open(context.Background())
 	if err != nil {
 		slog.Warn(fmt.Sprintf("webtransport stm0 init failed: %s", err))
-		return nil, nil, err
+		return nil, err
 	}
 
-	return tssn, tstm, nil
+	R := &Request{
+		Session: tssn,
+		Stream:  tstm,
+		Path:    r.URL.Path,
+		Values:  r.URL.Query(),
+		RealIP:  utils.RealIP(r),
+	}
+	return R, nil
 }

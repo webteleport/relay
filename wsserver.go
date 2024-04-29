@@ -8,10 +8,10 @@ import (
 
 func NewWSServer(host string, store Storage) *WSServer {
 	return &WSServer{
-		HOST:     host,
-		Storage:  store,
-		Upgrader: &WebsocketUpgrader{host},
-		Connect:  NewConnectHandler(),
+		HOST:         host,
+		Storage:      store,
+		HTTPUpgrader: &WebsocketUpgrader{host},
+		Connect:      NewConnectHandler(),
 	}
 }
 
@@ -23,27 +23,27 @@ func (s *WSServer) WithPostUpgrade(h http.Handler) *WSServer {
 type WSServer struct {
 	HOST string
 	Storage
-	Upgrader
+	HTTPUpgrader
 	Connect     http.Handler
 	PostUpgrade http.Handler
 }
 
 func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.IsUpgrade(r) {
-		tssn, tstm, err := s.Upgrade(w, r)
+		R, err := s.Upgrade(w, r)
 		if err != nil {
 			slog.Warn(fmt.Sprintf("upgrade websocket session failed: %s", err))
 			w.WriteHeader(500)
 			return
 		}
 
-		key, err := s.Negotiate(r, s.HOST, tssn, tstm)
+		key, err := s.Negotiate(R, s.HOST)
 		if err != nil {
 			slog.Warn(fmt.Sprintf("negotiate websocket session failed: %s", err))
 			return
 		}
 
-		s.Upsert(key, tssn, tstm, r)
+		s.Upsert(key, R)
 
 		return
 	}

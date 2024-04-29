@@ -2,20 +2,29 @@ package relay
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/webteleport/transport"
 )
 
 var _ Storage = (*SessionStore)(nil)
 
+type Request struct {
+	Session transport.Session
+	Stream  transport.Stream
+	Path    string
+	Values  url.Values
+	Header  http.Header
+	RealIP  string
+}
+
 // / transport agnostic CRUD
 type Storage interface {
 	// Upsert
-	Upsert(k string, tssn transport.Session, tstm transport.Stream, r *http.Request)
+	Upsert(k string, r *Request)
 	// Read
 	GetSession(k string) (transport.Session, bool)
 	Records() []*Record
-	RecordsHandler(w http.ResponseWriter, r *http.Request)
 	// Update
 	Visited(k string)
 	// Remove Session
@@ -25,27 +34,26 @@ type Storage interface {
 	// it should not be removed by the previous call
 	RemoveSession(tssn transport.Session)
 	// Rand
-	Allocate(r *http.Request, root string) (key string, hostnamePath string, err error)
-	Negotiate(r *http.Request, root string, tssn transport.Session, tstm transport.Stream) (key string, err error)
-	// Serve
+	Allocate(r *Request, root string) (key string, hostnamePath string, err error)
+	Negotiate(r *Request, root string) (key string, err error)
+	// Serve HTTP
 	http.Handler
 }
 
-var _ Upgrader = (*WebsocketUpgrader)(nil)
-var _ Upgrader = (*WebtransportUpgrader)(nil)
+var _ HTTPUpgrader = (*WebsocketUpgrader)(nil)
+var _ HTTPUpgrader = (*WebtransportUpgrader)(nil)
 
-type Upgrader interface {
+type HTTPUpgrader interface {
 	Root() string
 	IsRoot(r *http.Request) bool
 	IsUpgrade(r *http.Request) bool
-	Upgrade(w http.ResponseWriter, r *http.Request) (transport.Session, transport.Stream, error)
+	Upgrade(w http.ResponseWriter, r *http.Request) (*Request, error)
 }
 
 var _ Relayer = (*WSServer)(nil)
 var _ Relayer = (*WTServer)(nil)
 
 type Relayer interface {
-	Upgrader
 	Storage
 	http.Handler
 }

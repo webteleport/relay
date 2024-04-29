@@ -93,23 +93,6 @@ func (s *SessionStore) Records() (all []*Record) {
 	return
 }
 
-func (s *SessionStore) RecordsHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	all := s.Records()
-	filtered := []*Record{}
-	for _, rec := range all {
-		if rec.Matches(r.URL.Query()) {
-			filtered = append(filtered, rec)
-		}
-	}
-	resp, err := tags.UnescapedJSONMarshalIndent(filtered, "  ")
-	if err != nil {
-		slog.Warn(fmt.Sprintf("json marshal failed: %s", err))
-		return
-	}
-	w.Write(resp)
-}
-
 func (s *SessionStore) Visited(k string) {
 	k = utils.StripPort(k)
 	k, _ = idna.ToASCII(k)
@@ -149,21 +132,21 @@ func (s *SessionStore) GetSession(k string) (transport.Session, bool) {
 	return nil, false
 }
 
-func (s *SessionStore) Upsert(k string, tssn transport.Session, tstm transport.Stream, r *http.Request) {
+func (s *SessionStore) Upsert(k string, r *Request) {
 	k = utils.StripPort(k)
 	k, _ = idna.ToASCII(k)
 
 	since := time.Now()
 	header := tags.Tags{Values: url.Values(r.Header)}
-	tags := tags.Tags{Values: r.URL.Query()}
+	tags := tags.Tags{Values: r.Values}
 	rec := &Record{
-		Session: tssn,
+		Session: r.Session,
 		Header:  header,
 		Tags:    tags,
 		Since:   since,
 		Visited: 0,
 		Key:     k,
-		IP:      utils.RealIP(r),
+		IP:      r.RealIP,
 	}
 
 	s.Lock.Lock()
@@ -183,9 +166,9 @@ func (s *SessionStore) Upsert(k string, tssn transport.Session, tstm transport.S
 	s.WebLog(fmt.Sprintf("%s/%s?ip=%s", action, k, rec.IP))
 
 	if os.Getenv("PING") != "" {
-		go s.Ping(tssn, tstm)
+		go s.Ping(r)
 	}
-	go s.Scan(tssn, tstm)
+	go s.Scan(r)
 
 	expvars.WebteleportRelaySessionsAccepted.Add(1)
 }
@@ -195,19 +178,19 @@ func (s *SessionStore) Upsert(k string, tssn transport.Session, tstm transport.S
 //
 // This function has been found mostly unnecessary since the disconnect is automatically detected by the
 // underlying transport layer and handled by the Scan function. However, it is kept here for completeness.
-func (s *SessionStore) Ping(tssn transport.Session, tstm transport.Stream) {
+func (s *SessionStore) Ping(r *Request) {
 	for {
 		time.Sleep(s.PingInterval)
-		_, err := io.WriteString(tstm, "\n")
+		_, err := io.WriteString(r.Stream, "\n")
 		if err != nil {
 			break
 		}
 	}
-	s.RemoveSession(tssn)
+	s.RemoveSession(r.Session)
 }
 
-func (s *SessionStore) Scan(tssn transport.Session, tstm transport.Stream) {
-	scanner := bufio.NewScanner(tstm)
+func (s *SessionStore) Scan(r *Request) {
+	scanner := bufio.NewScanner(r.Stream)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" || line == "PONG" {
@@ -221,15 +204,13 @@ func (s *SessionStore) Scan(tssn transport.Session, tstm transport.Stream) {
 		}
 		slog.Warn(fmt.Sprintf("stm0: unknown command: %s", line))
 	}
-	s.RemoveSession(tssn)
+	s.RemoveSession(r.Session)
 }
 
-func (s *SessionStore) Allocate(r *http.Request, root string) (string, string, error) {
+func (s *SessionStore) Allocate(r *Request, root string) (string, string, error) {
 	var (
-		candidates = utils.ParseDomainCandidates(r.URL.Path)
-		Values     = r.URL.Query()
-		clobber    = Values.Get("clobber")
-		ip         = utils.RealIP(r)
+		candidates = utils.ParseDomainCandidates(r.Path)
+		clobber    = r.Values.Get("clobber")
 	)
 
 	sub := ""
@@ -244,7 +225,7 @@ func (s *SessionStore) Allocate(r *http.Request, root string) (string, string, e
 			s.Lock.RUnlock()
 
 			insert := !exist
-			updateByIP := exist && clobber == "" && rec.IP == ip
+			updateByIP := exist && clobber == "" && rec.IP == r.RealIP
 			updateByClobber := exist && clobber != "" && rec.Tags.Get("clobber") == clobber
 
 			if upsert := insert || updateByIP || updateByClobber; upsert {
@@ -262,24 +243,24 @@ func (s *SessionStore) Allocate(r *http.Request, root string) (string, string, e
 	hostnamePath := fmt.Sprintf("%s/%s/", root, sub)
 	key := hostname
 
-	if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/" {
+	if strings.HasSuffix(r.Path, "/") && r.Path != "/" {
 		return key, hostnamePath, nil
 	}
 	return key, hostname, nil
 }
 
-func (s *SessionStore) Negotiate(r *http.Request, root string, tssn transport.Session, tstm transport.Stream) (string, error) {
+func (s *SessionStore) Negotiate(r *Request, root string) (string, error) {
 	key, hp, err := s.Allocate(r, root)
 	if err != nil {
 		// Notify the client of the lease error
-		_, err1 := io.WriteString(tstm, fmt.Sprintf("ERR %s\n", err))
+		_, err1 := io.WriteString(r.Stream, fmt.Sprintf("ERR %s\n", err))
 		if err1 != nil {
 			return "", err1
 		}
 		return "", err
 	} else {
 		// Notify the client of the hostname/path
-		_, err1 := io.WriteString(tstm, fmt.Sprintf("HOST %s\n", hp))
+		_, err1 := io.WriteString(r.Stream, fmt.Sprintf("HOST %s\n", hp))
 		if err1 != nil {
 			return "", err1
 		}

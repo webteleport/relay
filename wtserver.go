@@ -56,20 +56,20 @@ type WTServer struct {
 
 func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.IsUpgrade(r) {
-		tssn, tstm, err := s.Upgrade(w, r)
+		R, err := s.Upgrade(w, r)
 		if err != nil {
 			slog.Warn(fmt.Sprintf("upgrade webtransport session failed: %s", err))
 			w.WriteHeader(500)
 			return
 		}
 
-		key, err := s.Negotiate(r, s.HOST, tssn, tstm)
+		key, err := s.Negotiate(R, s.HOST)
 		if err != nil {
 			slog.Warn(fmt.Sprintf("negotiate webtransport session failed: %s", err))
 			return
 		}
 
-		s.Upsert(key, tssn, tstm, r)
+		s.Upsert(key, R)
 
 		return
 	}

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/btwiuse/connect"
+	"github.com/btwiuse/tags"
 	"github.com/webteleport/utils"
 )
 
@@ -98,6 +99,23 @@ func DefaultIndex() http.Handler {
 
 func leadingComponent(s string) string {
 	return strings.Split(strings.TrimPrefix(s, "/"), "/")[0]
+}
+
+func (s *WSServer) RecordsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	all := s.Records()
+	filtered := []*Record{}
+	for _, rec := range all {
+		if rec.Matches(r.URL.Query()) {
+			filtered = append(filtered, rec)
+		}
+	}
+	resp, err := tags.UnescapedJSONMarshalIndent(filtered, "  ")
+	if err != nil {
+		slog.Warn(fmt.Sprintf("json marshal failed: %s", err))
+		return
+	}
+	w.Write(resp)
 }
 
 func (s *WSServer) IndexHandler(w http.ResponseWriter, r *http.Request) {
