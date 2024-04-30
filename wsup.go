@@ -8,6 +8,7 @@ import (
 
 	"github.com/btwiuse/wsconn"
 	"github.com/webteleport/utils"
+	"github.com/webteleport/webteleport/transport/common"
 	"github.com/webteleport/webteleport/transport/websocket"
 )
 
@@ -34,9 +35,9 @@ func (*WebsocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (*Requ
 		w.WriteHeader(500)
 		return nil, err
 	}
-	gender, ssn, err := websocket.YamuxReverseGender(conn, r)
+	ssn, err := common.YamuxClient(conn)
 	if err != nil {
-		slog.Warn(fmt.Sprintf("websocket creating yamux %s failed: %s", gender, err))
+		slog.Warn(fmt.Sprintf("websocket creating yamux client failed: %s", err))
 		w.WriteHeader(500)
 		return nil, err
 	}

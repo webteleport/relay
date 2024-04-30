@@ -50,6 +50,15 @@ type HTTPUpgrader interface {
 	Upgrade(w http.ResponseWriter, r *http.Request) (*Request, error)
 }
 
+var _ Upgrader = (*QuicGoUpgrader)(nil)
+var _ Upgrader = (*GoQuicUpgrader)(nil)
+var _ Upgrader = (*TcpUpgrader)(nil)
+
+type Upgrader interface {
+	Host() string
+	Upgrade() (*Request, error)
+}
+
 var _ Relayer = (*WSServer)(nil)
 var _ Relayer = (*WTServer)(nil)
 
