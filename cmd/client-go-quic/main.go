@@ -5,11 +5,12 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/webteleport/webteleport/transport/tcp"
+	"github.com/webteleport/relay/cmd"
+	"github.com/webteleport/webteleport/transport/go-quic"
 )
 
 func main() {
-	ln, err := tcp.Listen(context.Background(), "127.0.0.1:8081/test?asdf=1")
+	ln, err := quic.Listen(context.Background(), cmd.Arg1("127.0.0.1:8083/test-go-quic?asdf=1"))
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -9,7 +9,7 @@ import (
 )
 
 type GoQuicUpgrader struct {
-	*quic.Endpoint
+	Listener *quic.Endpoint
 	HOST string
 }
 
@@ -18,7 +18,7 @@ func (s *GoQuicUpgrader) Host() string {
 }
 
 func (s *GoQuicUpgrader) Upgrade() (*Request, error) {
-	conn, err := s.Endpoint.Accept(context.Background())
+	conn, err := s.Listener.Accept(context.Background())
 	if err != nil {
 		return nil, err
 	}
