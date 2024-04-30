@@ -3,7 +3,6 @@ package relay
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/btwiuse/wsconn"
@@ -31,21 +30,18 @@ func (s *WebsocketUpgrader) IsUpgrade(r *http.Request) (result bool) {
 func (*WebsocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (*Request, error) {
 	conn, err := wsconn.Wrconn(w, r)
 	if err != nil {
-		slog.Warn(fmt.Sprintf("websocket upgrade failed: %s", err))
 		w.WriteHeader(500)
-		return nil, err
+		return nil, fmt.Errorf("websocket upgrade failed: %w", err)
 	}
 	ssn, err := common.YamuxClient(conn)
 	if err != nil {
-		slog.Warn(fmt.Sprintf("websocket creating yamux client failed: %s", err))
 		w.WriteHeader(500)
-		return nil, err
+		return nil, fmt.Errorf("websocket creating yamux client failed: %w", err)
 	}
 	tssn := &websocket.WebsocketSession{Session: ssn}
 	tstm, err := tssn.Open(context.Background())
 	if err != nil {
-		slog.Warn(fmt.Sprintf("websocket stm0 init failed: %s", err))
-		return nil, err
+		return nil, fmt.Errorf("websocket stm0 init failed: %w", err)
 	}
 
 	R := &Request{

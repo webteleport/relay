@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.Llongfile)
 	ln, err := quic.Listen(context.Background(), cmd.Arg1("127.0.0.1:8082/test-quic-go?asdf=1"))
 	if err != nil {
 		log.Fatal(err)

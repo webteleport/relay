@@ -1,3 +1,4 @@
+// not working yet
 package main
 
 import (
@@ -10,6 +11,7 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.Llongfile)
 	ln, err := quic.Listen(context.Background(), cmd.Arg1("127.0.0.1:8083/test-go-quic?asdf=1"))
 	if err != nil {
 		log.Fatal(err)

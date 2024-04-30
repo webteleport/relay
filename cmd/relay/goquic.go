@@ -14,7 +14,7 @@ var GoQuicConfig = &quic.Config{
 }
 
 func newGoQuicUpgrader(host string, port string) (*relay.GoQuicUpgrader, error) {
-	qln, err := quic.Listen("udp", ":"+port, GoQuicConfig)
+	qln, err := quic.Listen("udp", "0.0.0.0:"+port, GoQuicConfig)
 	if err != nil {
 		return nil, err
 	}

@@ -16,7 +16,7 @@ require (
 	github.com/quic-go/webtransport-go v0.8.0
 	github.com/webteleport/transport v0.0.0
 	github.com/webteleport/utils v0.2.14
-	github.com/webteleport/webteleport v0.5.19
+	github.com/webteleport/webteleport v0.5.20
 	github.com/webtransport/quic v0.1.5
 	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f
 	golang.org/x/net v0.24.0

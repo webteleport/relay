@@ -3,7 +3,6 @@ package relay
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	wt "github.com/quic-go/webtransport-go"
@@ -31,16 +30,14 @@ func (s *WebtransportUpgrader) IsUpgrade(r *http.Request) (result bool) {
 func (s *WebtransportUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (*Request, error) {
 	ssn, err := s.Server.Upgrade(w, r)
 	if err != nil {
-		slog.Warn(fmt.Sprintf("webtransport upgrade failed: %s", err))
 		w.WriteHeader(500)
-		return nil, err
+		return nil, fmt.Errorf("webtransport upgrade failed: %w", err)
 	}
 
 	tssn := &webtransport.WebtransportSession{Session: ssn}
 	tstm, err := tssn.Open(context.Background())
 	if err != nil {
-		slog.Warn(fmt.Sprintf("webtransport stm0 init failed: %s", err))
-		return nil, err
+		return nil, fmt.Errorf("webtransport stm0 init failed: %w", err)
 	}
 
 	R := &Request{

@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.Llongfile)
 	ln, err := tcp.Listen(context.Background(), cmd.Arg1("127.0.0.1:8081/test?asdf=1"))
 	if err != nil {
 		log.Fatal(err)

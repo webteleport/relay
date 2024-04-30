@@ -16,13 +16,12 @@ var QuicGoConfig = &quic.Config{
 }
 
 func newQuicGoUpgrader(host string, port string) (*relay.QuicGoUpgrader, error) {
-	addr, err := net.ResolveUDPAddr("udp", ":"+port)
+	addr, err := net.ResolveUDPAddr("udp", "0.0.0.0:"+port)
 	if err != nil {
 		return nil, err
 	}
 
 	ln, err := net.ListenUDP("udp", addr)
-	// ln, err := net.Listen("udp", ":"+port)
 	if err != nil {
 		return nil, err
 	}

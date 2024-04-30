@@ -32,6 +32,7 @@ func getEnv(key, fallback string) string {
 var HOST = getEnv("HOST", "localhost:8080")
 
 func main() {
+	log.SetFlags(log.Llongfile)
 	store := relay.NewSessionStore()
 
 	tcpUpgrader, err := newTcpUpgrader(HOST, "8081")
@@ -52,7 +53,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Starting server on go-quic://127.0.0.1:8083")
+	log.Println("Starting server on go-quic://127.0.0.1:8083 [not working yet]")
 	go serveUpgrader(goQuicUpgrader, store)
 
 	s := relay.NewWSServer(HOST, store)

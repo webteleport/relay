@@ -3,8 +3,8 @@ package relay
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net"
+	"net/url"
 
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/transport/common"
@@ -29,20 +29,24 @@ func (s *TcpUpgrader) Upgrade() (*Request, error) {
 	ssn, err := common.YamuxClient(conn)
 	if err != nil {
 		conn.Close()
-		slog.Warn(fmt.Sprintf("tcp creating yamux client failed: %s", err))
-		return nil, err
+		return nil, fmt.Errorf("tcp creating yamux client failed: %w", err)
 	}
 
 	tssn := &tcp.TcpSession{ssn}
 
 	stm0, err := tssn.Open(context.Background())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open stm0 error: %w", err)
 	}
 
-	u, err := readAndParseFirstLine(stm0)
+	ruri, err := ReadLine(stm0)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read request uri error: %w", err)
+	}
+
+	u, err := url.ParseRequestURI(ruri)
+	if err != nil {
+		return nil, fmt.Errorf("parse request uri error: %w", err)
 	}
 
 	R := &Request{
