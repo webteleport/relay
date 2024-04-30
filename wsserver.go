@@ -1,18 +1,22 @@
 package relay
 
 import (
-	"fmt"
-	"log/slog"
 	"net/http"
 )
 
 func NewWSServer(host string, store Storage) *WSServer {
-	return &WSServer{
+	hu := &WebsocketUpgrader{
+		root: host,
+		reqc: make(chan *Request, 10),
+	}
+	s := &WSServer{
 		HOST:         host,
 		Storage:      store,
-		HTTPUpgrader: &WebsocketUpgrader{host},
+		HTTPUpgrader: hu,
 		Connect:      NewConnectHandler(),
 	}
+	go store.Subscribe(hu)
+	return s
 }
 
 func (s *WSServer) WithPostUpgrade(h http.Handler) *WSServer {
@@ -30,21 +34,7 @@ type WSServer struct {
 
 func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.IsUpgrade(r) {
-		R, err := s.Upgrade(w, r)
-		if err != nil {
-			slog.Warn(fmt.Sprintf("upgrade websocket session failed: %s", err))
-			w.WriteHeader(500)
-			return
-		}
-
-		key, err := s.Negotiate(R, s.HOST)
-		if err != nil {
-			slog.Warn(fmt.Sprintf("negotiate websocket session failed: %s", err))
-			return
-		}
-
-		s.Upsert(key, R)
-
+		s.HTTPUpgrader.ServeHTTP(w, r)
 		return
 	}
 
@@ -53,9 +43,6 @@ func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// for HTTP_PROXY r.Method = GET && r.Host = google.com
-	// for HTTPS_PROXY r.Method = GET && r.Host = google.com:443
-	// they are currently not supported and will be handled by the 404 handler
 	if s.IsRoot(r) {
 		s.IndexHandler(w, r)
 		return

@@ -290,3 +290,30 @@ func (s *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rp.ServeHTTP(w, r)
 	expvars.WebteleportRelayStreamsClosed.Add(1)
 }
+
+func (s *SessionStore) Subscribe(upgrader Upgrader) {
+	for {
+		r, err := upgrader.Upgrade()
+		if err == io.EOF {
+			slog.Warn("upgrade EOF")
+			break
+		}
+
+		if err != nil {
+			slog.Warn(fmt.Sprintf("upgrade session failed: %s", err))
+			continue
+		}
+
+		if s.Verbose {
+			slog.Info("subscribe", "request", r)
+		}
+
+		key, err := s.Negotiate(r, upgrader.Root())
+		if err != nil {
+			slog.Warn(fmt.Sprintf("negotiate session failed: %s", err))
+			return
+		}
+
+		s.Upsert(key, r)
+	}
+}

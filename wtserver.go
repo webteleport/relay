@@ -2,8 +2,6 @@ package relay
 
 import (
 	"crypto/tls"
-	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/quic-go/quic-go/http3"
@@ -11,8 +9,9 @@ import (
 )
 
 func NewWTServer(host string, store Storage) *WTServer {
-	u := &WebtransportUpgrader{
+	hu := &WebtransportUpgrader{
 		root: host,
+		reqc: make(chan *Request, 10),
 		Server: &wt.Server{
 			CheckOrigin: func(*http.Request) bool { return true },
 		},
@@ -20,14 +19,15 @@ func NewWTServer(host string, store Storage) *WTServer {
 	s := &WTServer{
 		HOST:                 host,
 		Storage:              store,
-		WebtransportUpgrader: u,
+		WebtransportUpgrader: hu,
 		Connect:              NewConnectHandler(),
 	}
-	u.Server.H3 = http3.Server{
+	hu.Server.H3 = http3.Server{
 		Handler: s,
 		// WebTransport requires DATAGRAM support
 		EnableDatagrams: true,
 	}
+	go store.Subscribe(hu)
 	return s
 }
 
@@ -56,21 +56,7 @@ type WTServer struct {
 
 func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.IsUpgrade(r) {
-		R, err := s.Upgrade(w, r)
-		if err != nil {
-			slog.Warn(fmt.Sprintf("upgrade webtransport session failed: %s", err))
-			w.WriteHeader(500)
-			return
-		}
-
-		key, err := s.Negotiate(R, s.HOST)
-		if err != nil {
-			slog.Warn(fmt.Sprintf("negotiate webtransport session failed: %s", err))
-			return
-		}
-
-		s.Upsert(key, R)
-
+		s.WebtransportUpgrader.ServeHTTP(w, r)
 		return
 	}
 

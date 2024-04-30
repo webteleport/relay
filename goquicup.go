@@ -15,7 +15,7 @@ type GoQuicUpgrader struct {
 	HOST     string
 }
 
-func (s *GoQuicUpgrader) Host() string {
+func (s *GoQuicUpgrader) Root() string {
 	return s.HOST
 }
 

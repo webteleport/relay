@@ -3,6 +3,8 @@ package relay
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 
 	wt "github.com/quic-go/webtransport-go"
@@ -12,6 +14,7 @@ import (
 
 type WebtransportUpgrader struct {
 	root string
+	reqc chan *Request
 	*wt.Server
 }
 
@@ -27,17 +30,18 @@ func (s *WebtransportUpgrader) IsUpgrade(r *http.Request) (result bool) {
 	return r.URL.Query().Get("x-webtransport-upgrade") != "" && s.IsRoot(r)
 }
 
-func (s *WebtransportUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (*Request, error) {
+func (s *WebtransportUpgrader) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ssn, err := s.Server.Upgrade(w, r)
 	if err != nil {
 		w.WriteHeader(500)
-		return nil, fmt.Errorf("webtransport upgrade failed: %w", err)
+		slog.Warn(fmt.Errorf("webtransport upgrade failed: %w", err).Error())
 	}
 
 	tssn := &webtransport.WebtransportSession{Session: ssn}
 	tstm, err := tssn.Open(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("webtransport stm0 init failed: %w", err)
+		w.WriteHeader(500)
+		slog.Warn(fmt.Errorf("webtransport stm0 init failed: %w", err).Error())
 	}
 
 	R := &Request{
@@ -47,5 +51,13 @@ func (s *WebtransportUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (
 		Values:  r.URL.Query(),
 		RealIP:  utils.RealIP(r),
 	}
-	return R, nil
+	s.reqc <- R
+}
+
+func (s *WebtransportUpgrader) Upgrade() (*Request, error) {
+	r, ok := <-s.reqc
+	if !ok {
+		return nil, io.EOF
+	}
+	return r, nil
 }

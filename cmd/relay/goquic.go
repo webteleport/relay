@@ -1,6 +1,9 @@
 package main
 
 import (
+	"log/slog"
+	"os"
+
 	"github.com/webteleport/relay"
 	"github.com/webtransport/quic"
 )
@@ -11,6 +14,10 @@ var MaxBidiRemoteStreams int64 = 1 << 60
 var GoQuicConfig = &quic.Config{
 	TLSConfig:            TLSConfig,
 	MaxBidiRemoteStreams: MaxBidiRemoteStreams,
+	QLogLogger: slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     quic.QLogLevelFrame,
+	})),
 }
 
 func newGoQuicUpgrader(host string, port string) (*relay.GoQuicUpgrader, error) {

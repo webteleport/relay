@@ -16,7 +16,7 @@ type TcpUpgrader struct {
 	HOST string
 }
 
-func (s *TcpUpgrader) Host() string {
+func (s *TcpUpgrader) Root() string {
 	return s.HOST
 }
 

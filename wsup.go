@@ -3,6 +3,8 @@ package relay
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/btwiuse/wsconn"
@@ -13,6 +15,7 @@ import (
 
 type WebsocketUpgrader struct {
 	root string
+	reqc chan *Request
 }
 
 func (s *WebsocketUpgrader) Root() string {
@@ -27,21 +30,27 @@ func (s *WebsocketUpgrader) IsUpgrade(r *http.Request) (result bool) {
 	return r.URL.Query().Get("x-websocket-upgrade") != "" && s.IsRoot(r)
 }
 
-func (*WebsocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (*Request, error) {
+func (s *WebsocketUpgrader) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := wsconn.Wrconn(w, r)
 	if err != nil {
 		w.WriteHeader(500)
-		return nil, fmt.Errorf("websocket upgrade failed: %w", err)
+		slog.Warn(fmt.Errorf("websocket upgrade failed: %w", err).Error())
+		return
 	}
+
 	ssn, err := common.YamuxClient(conn)
 	if err != nil {
 		w.WriteHeader(500)
-		return nil, fmt.Errorf("websocket creating yamux client failed: %w", err)
+		slog.Warn(fmt.Errorf("websocket creating yamux client failed: %w", err).Error())
+		return
 	}
+
 	tssn := &websocket.WebsocketSession{Session: ssn}
 	tstm, err := tssn.Open(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("websocket stm0 init failed: %w", err)
+		w.WriteHeader(500)
+		slog.Warn(fmt.Errorf("websocket stm0 init failed: %w", err).Error())
+		return
 	}
 
 	R := &Request{
@@ -51,5 +60,13 @@ func (*WebsocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (*Requ
 		Values:  r.URL.Query(),
 		RealIP:  utils.RealIP(r),
 	}
-	return R, nil
+	s.reqc <- R
+}
+
+func (s *WebsocketUpgrader) Upgrade() (*Request, error) {
+	r, ok := <-s.reqc
+	if !ok {
+		return nil, io.EOF
+	}
+	return r, nil
 }
