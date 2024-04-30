@@ -6,6 +6,7 @@ import (
 
 	"github.com/quic-go/quic-go/http3"
 	wt "github.com/quic-go/webtransport-go"
+	"github.com/webteleport/utils"
 )
 
 func NewWTServer(host string, store Storage) *WTServer {
@@ -71,4 +72,12 @@ func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.Storage.ServeHTTP(w, r)
+}
+
+func (s *WTServer) IsRoot(r *http.Request) bool {
+	return utils.StripPort(r.Host) == utils.StripPort(s.HOST)
+}
+
+func (s *WTServer) IsUpgrade(r *http.Request) bool {
+	return r.URL.Query().Get("x-webtransport-upgrade") != "" && s.IsRoot(r)
 }

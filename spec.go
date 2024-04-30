@@ -46,15 +46,13 @@ type Storage interface {
 	http.Handler
 
 	// Subscribe
-	Subscribe(upgrader Upgrader)
+	Subscriber
 }
 
 var _ HTTPUpgrader = (*WebsocketUpgrader)(nil)
 var _ HTTPUpgrader = (*WebtransportUpgrader)(nil)
 
 type HTTPUpgrader interface {
-	IsRoot(r *http.Request) bool
-	IsUpgrade(r *http.Request) bool
 	Upgrader
 	http.Handler
 }
@@ -68,10 +66,15 @@ type Upgrader interface {
 	Upgrade() (*Request, error)
 }
 
+type Subscriber interface {
+	Subscribe(upgrader Upgrader)
+}
+
 var _ Relayer = (*WSServer)(nil)
 var _ Relayer = (*WTServer)(nil)
 
 type Relayer interface {
 	Storage
-	http.Handler
+	HTTPUpgrader
+	IsUpgrade(r *http.Request) bool
 }

@@ -22,14 +22,6 @@ func (s *WebsocketUpgrader) Root() string {
 	return s.root
 }
 
-func (s *WebsocketUpgrader) IsRoot(r *http.Request) (result bool) {
-	return r.Host == s.Root()
-}
-
-func (s *WebsocketUpgrader) IsUpgrade(r *http.Request) (result bool) {
-	return r.URL.Query().Get("x-websocket-upgrade") != "" && s.IsRoot(r)
-}
-
 func (s *WebsocketUpgrader) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := wsconn.Wrconn(w, r)
 	if err != nil {

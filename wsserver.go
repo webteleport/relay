@@ -55,3 +55,11 @@ func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	s.Storage.ServeHTTP(w, r)
 }
+
+func (s *WSServer) IsRoot(r *http.Request) bool {
+	return r.Host == s.HOST
+}
+
+func (s *WSServer) IsUpgrade(r *http.Request) (result bool) {
+	return r.URL.Query().Get("x-websocket-upgrade") != "" && s.IsRoot(r)
+}

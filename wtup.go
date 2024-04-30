@@ -22,14 +22,6 @@ func (s *WebtransportUpgrader) Root() string {
 	return s.root
 }
 
-func (s *WebtransportUpgrader) IsRoot(r *http.Request) (result bool) {
-	return utils.StripPort(r.Host) == utils.StripPort(s.Root())
-}
-
-func (s *WebtransportUpgrader) IsUpgrade(r *http.Request) (result bool) {
-	return r.URL.Query().Get("x-webtransport-upgrade") != "" && s.IsRoot(r)
-}
-
 func (s *WebtransportUpgrader) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ssn, err := s.Server.Upgrade(w, r)
 	if err != nil {
