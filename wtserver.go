@@ -6,25 +6,24 @@ import (
 
 	"github.com/quic-go/quic-go/http3"
 	wt "github.com/quic-go/webtransport-go"
-	"github.com/webteleport/webteleport/spec"
 	"github.com/webteleport/utils"
+	"github.com/webteleport/webteleport/transport/webtransport"
 )
 
 var _ Relayer = (*WTServer)(nil)
 
 func NewWTServer(host string, store Storage) *WTServer {
-	hu := &WebtransportUpgrader{
-		root: host,
-		reqc: make(chan *spec.Request, 10),
+	hu := &webtransport.Upgrader{
+		HOST: host,
 		Server: &wt.Server{
 			CheckOrigin: func(*http.Request) bool { return true },
 		},
 	}
 	s := &WTServer{
-		HOST:                 host,
-		Storage:              store,
-		WebtransportUpgrader: hu,
-		Connect:              NewConnectHandler(),
+		HOST:     host,
+		Storage:  store,
+		Upgrader: hu,
+		Connect:  NewConnectHandler(),
 	}
 	hu.Server.H3 = http3.Server{
 		Handler: s,
@@ -36,12 +35,12 @@ func NewWTServer(host string, store Storage) *WTServer {
 }
 
 func (s *WTServer) WithAddr(a string) *WTServer {
-	s.WebtransportUpgrader.Server.H3.Addr = a
+	s.Upgrader.Server.H3.Addr = a
 	return s
 }
 
 func (s *WTServer) WithTLSConfig(tlsConfig *tls.Config) *WTServer {
-	s.WebtransportUpgrader.Server.H3.TLSConfig = tlsConfig
+	s.Upgrader.Server.H3.TLSConfig = tlsConfig
 	return s
 }
 
@@ -53,14 +52,14 @@ func (s *WTServer) WithPostUpgrade(h http.Handler) *WTServer {
 type WTServer struct {
 	HOST string
 	Storage
-	*WebtransportUpgrader
+	*webtransport.Upgrader
 	Connect     http.Handler
 	PostUpgrade http.Handler
 }
 
 func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.IsUpgrade(r) {
-		s.WebtransportUpgrader.ServeHTTP(w, r)
+		s.Upgrader.ServeHTTP(w, r)
 		return
 	}
 

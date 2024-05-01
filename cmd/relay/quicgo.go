@@ -4,7 +4,7 @@ import (
 	"net"
 
 	"github.com/quic-go/quic-go"
-	"github.com/webteleport/relay"
+	qg "github.com/webteleport/webteleport/transport/quic-go"
 )
 
 // 2^60 == 1152921504606846976
@@ -15,7 +15,7 @@ var QuicGoConfig = &quic.Config{
 	MaxIncomingStreams: MaxIncomingStreams,
 }
 
-func newQuicGoUpgrader(host string, port string) (*relay.QuicGoUpgrader, error) {
+func newQuicGoUpgrader(host string, port string) (*qg.Upgrader, error) {
 	addr, err := net.ResolveUDPAddr("udp", "0.0.0.0:"+port)
 	if err != nil {
 		return nil, err
@@ -30,7 +30,7 @@ func newQuicGoUpgrader(host string, port string) (*relay.QuicGoUpgrader, error) 
 		return nil, err
 	}
 
-	upgrader := &relay.QuicGoUpgrader{
+	upgrader := &qg.Upgrader{
 		Listener: qln,
 		HOST:     host,
 	}

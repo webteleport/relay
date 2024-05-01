@@ -9,20 +9,20 @@ require (
 	github.com/btwiuse/connect v0.0.5
 	github.com/btwiuse/rng v0.0.0
 	github.com/btwiuse/tags v0.0.2
-	github.com/btwiuse/wsconn v0.0.1
 	github.com/caddyserver/certmagic v0.20.0
 	github.com/libdns/digitalocean v0.0.0-20230728223659-4f9064657aea
 	github.com/quic-go/quic-go v0.43.0
 	github.com/quic-go/webtransport-go v0.8.0
 	github.com/webteleport/transport v0.0.0
 	github.com/webteleport/utils v0.2.14
-	github.com/webteleport/webteleport v0.5.22
+	github.com/webteleport/webteleport v0.5.24
 	github.com/webtransport/quic v0.1.7
 	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f
 	golang.org/x/net v0.24.0
 )
 
 require (
+	github.com/btwiuse/wsconn v0.0.1 // indirect
 	github.com/digitalocean/godo v1.41.0 // indirect
 	github.com/docker/docker v25.0.1+incompatible // indirect
 	github.com/ebi-yade/altsvc-go v0.1.1 // indirect

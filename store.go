@@ -17,9 +17,9 @@ import (
 
 	"github.com/btwiuse/rng"
 	"github.com/btwiuse/tags"
-	"github.com/webteleport/webteleport/spec"
 	"github.com/webteleport/transport"
 	"github.com/webteleport/utils"
+	"github.com/webteleport/webteleport/spec"
 	"golang.org/x/exp/maps"
 	"golang.org/x/net/idna"
 )

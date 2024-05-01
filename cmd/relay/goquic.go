@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/webteleport/relay"
+	gq "github.com/webteleport/webteleport/transport/go-quic"
 	"github.com/webtransport/quic"
 )
 
@@ -20,13 +20,13 @@ var GoQuicConfig = &quic.Config{
 	})),
 }
 
-func newGoQuicUpgrader(host string, port string) (*relay.GoQuicUpgrader, error) {
+func newGoQuicUpgrader(host string, port string) (*gq.Upgrader, error) {
 	qln, err := quic.Listen("udp", "0.0.0.0:"+port, GoQuicConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	upgrader := &relay.GoQuicUpgrader{
+	upgrader := &gq.Upgrader{
 		Listener: qln,
 		HOST:     host,
 	}

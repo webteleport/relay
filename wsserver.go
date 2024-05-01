@@ -4,12 +4,13 @@ import (
 	"net/http"
 
 	"github.com/webteleport/webteleport/spec"
+	"github.com/webteleport/webteleport/transport/websocket"
 )
 
 var _ Relayer = (*WSServer)(nil)
 
 func NewWSServer(host string, store Storage) *WSServer {
-	hu := &WebsocketUpgrader{
+	hu := &websocket.Upgrader{
 		HOST: host,
 	}
 	s := &WSServer{
