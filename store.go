@@ -17,14 +17,14 @@ import (
 
 	"github.com/btwiuse/rng"
 	"github.com/btwiuse/tags"
-	"github.com/webteleport/relay/spec"
+	"github.com/webteleport/webteleport/spec"
 	"github.com/webteleport/transport"
 	"github.com/webteleport/utils"
 	"golang.org/x/exp/maps"
 	"golang.org/x/net/idna"
 )
 
-var _ spec.Storage = (*SessionStore)(nil)
+var _ Storage = (*SessionStore)(nil)
 
 func NewSessionStore() *SessionStore {
 	return &SessionStore{

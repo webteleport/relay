@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/webteleport/relay/spec"
+	"github.com/webteleport/webteleport/spec"
 	"github.com/webteleport/utils"
 	gq "github.com/webteleport/webteleport/transport/go-quic"
 	"github.com/webtransport/quic"

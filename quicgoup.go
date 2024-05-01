@@ -6,7 +6,7 @@ import (
 	"net/url"
 
 	"github.com/quic-go/quic-go"
-	"github.com/webteleport/relay/spec"
+	"github.com/webteleport/webteleport/spec"
 	"github.com/webteleport/utils"
 	qg "github.com/webteleport/webteleport/transport/quic-go"
 )

@@ -6,7 +6,7 @@ import (
 	"net"
 	"net/url"
 
-	"github.com/webteleport/relay/spec"
+	"github.com/webteleport/webteleport/spec"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/transport/common"
 	"github.com/webteleport/webteleport/transport/tcp"
