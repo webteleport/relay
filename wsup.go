@@ -8,14 +8,17 @@ import (
 	"net/http"
 
 	"github.com/btwiuse/wsconn"
+	"github.com/webteleport/relay/spec"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/transport/common"
 	"github.com/webteleport/webteleport/transport/websocket"
 )
 
+var _ spec.HTTPUpgrader = (*WebsocketUpgrader)(nil)
+
 type WebsocketUpgrader struct {
 	HOST string
-	reqc chan *Request
+	reqc chan *spec.Request
 }
 
 func (s *WebsocketUpgrader) Root() string {
@@ -42,7 +45,7 @@ func (s *WebsocketUpgrader) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	R := &Request{
+	R := &spec.Request{
 		Session: tssn,
 		Stream:  tstm,
 		Path:    r.URL.Path,
@@ -52,9 +55,9 @@ func (s *WebsocketUpgrader) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.reqc <- R
 }
 
-func (s *WebsocketUpgrader) Upgrade() (*Request, error) {
+func (s *WebsocketUpgrader) Upgrade() (*spec.Request, error) {
 	if s.reqc == nil {
-		s.reqc = make(chan *Request, 10)
+		s.reqc = make(chan *spec.Request, 10)
 	}
 	r, ok := <-s.reqc
 	if !ok {

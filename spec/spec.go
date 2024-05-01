@@ -1,4 +1,4 @@
-package relay
+package spec
 
 import (
 	"net/http"
@@ -6,8 +6,6 @@ import (
 
 	"github.com/webteleport/transport"
 )
-
-var _ Storage = (*SessionStore)(nil)
 
 type Request struct {
 	Session transport.Session
@@ -23,7 +21,8 @@ type Storage interface {
 	// Read
 	// TODO: make it private
 	GetSession(k string) (transport.Session, bool)
-	Records() []*Record
+	// Records() []*Record
+	RecordsHandler(w http.ResponseWriter, r *http.Request)
 
 	// Update
 	// TODO: make it private
@@ -49,17 +48,10 @@ type Storage interface {
 	Subscriber
 }
 
-var _ HTTPUpgrader = (*WebsocketUpgrader)(nil)
-var _ HTTPUpgrader = (*WebtransportUpgrader)(nil)
-
 type HTTPUpgrader interface {
 	Upgrader
 	http.Handler
 }
-
-var _ Upgrader = (*QuicGoUpgrader)(nil)
-var _ Upgrader = (*GoQuicUpgrader)(nil)
-var _ Upgrader = (*TcpUpgrader)(nil)
 
 type Upgrader interface {
 	Root() string
@@ -69,9 +61,6 @@ type Upgrader interface {
 type Subscriber interface {
 	Subscribe(upgrader Upgrader)
 }
-
-var _ Relayer = (*WSServer)(nil)
-var _ Relayer = (*WTServer)(nil)
 
 type Relayer interface {
 	http.Handler

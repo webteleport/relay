@@ -8,13 +8,16 @@ import (
 	"net/http"
 
 	wt "github.com/quic-go/webtransport-go"
+	"github.com/webteleport/relay/spec"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/transport/webtransport"
 )
 
+var _ spec.HTTPUpgrader = (*WebtransportUpgrader)(nil)
+
 type WebtransportUpgrader struct {
 	root string
-	reqc chan *Request
+	reqc chan *spec.Request
 	*wt.Server
 }
 
@@ -34,7 +37,7 @@ func (s *WebtransportUpgrader) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		slog.Warn(fmt.Errorf("webtransport stm0 init failed: %w", err).Error())
 	}
 
-	R := &Request{
+	R := &spec.Request{
 		Session: tssn,
 		Stream:  tstm,
 		Path:    r.URL.Path,
@@ -44,7 +47,7 @@ func (s *WebtransportUpgrader) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	s.reqc <- R
 }
 
-func (s *WebtransportUpgrader) Upgrade() (*Request, error) {
+func (s *WebtransportUpgrader) Upgrade() (*spec.Request, error) {
 	r, ok := <-s.reqc
 	if !ok {
 		return nil, io.EOF

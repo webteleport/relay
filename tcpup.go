@@ -6,10 +6,13 @@ import (
 	"net"
 	"net/url"
 
+	"github.com/webteleport/relay/spec"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/transport/common"
 	"github.com/webteleport/webteleport/transport/tcp"
 )
+
+var _ spec.Upgrader = (*TcpUpgrader)(nil)
 
 type TcpUpgrader struct {
 	net.Listener
@@ -20,7 +23,7 @@ func (s *TcpUpgrader) Root() string {
 	return s.HOST
 }
 
-func (s *TcpUpgrader) Upgrade() (*Request, error) {
+func (s *TcpUpgrader) Upgrade() (*spec.Request, error) {
 	conn, err := s.Listener.Accept()
 	if err != nil {
 		return nil, err
@@ -49,7 +52,7 @@ func (s *TcpUpgrader) Upgrade() (*Request, error) {
 		return nil, fmt.Errorf("parse request uri error: %w", err)
 	}
 
-	R := &Request{
+	R := &spec.Request{
 		Session: tssn,
 		Stream:  stm0,
 		Path:    u.Path,

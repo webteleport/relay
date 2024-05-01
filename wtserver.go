@@ -6,13 +6,16 @@ import (
 
 	"github.com/quic-go/quic-go/http3"
 	wt "github.com/quic-go/webtransport-go"
+	"github.com/webteleport/relay/spec"
 	"github.com/webteleport/utils"
 )
 
-func NewWTServer(host string, store Storage) *WTServer {
+var _ spec.Relayer = (*WTServer)(nil)
+
+func NewWTServer(host string, store spec.Storage) *WTServer {
 	hu := &WebtransportUpgrader{
 		root: host,
-		reqc: make(chan *Request, 10),
+		reqc: make(chan *spec.Request, 10),
 		Server: &wt.Server{
 			CheckOrigin: func(*http.Request) bool { return true },
 		},
@@ -49,7 +52,7 @@ func (s *WTServer) WithPostUpgrade(h http.Handler) *WTServer {
 
 type WTServer struct {
 	HOST string
-	Storage
+	spec.Storage
 	*WebtransportUpgrader
 	Connect     http.Handler
 	PostUpgrade http.Handler

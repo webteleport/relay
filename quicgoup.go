@@ -6,9 +6,12 @@ import (
 	"net/url"
 
 	"github.com/quic-go/quic-go"
+	"github.com/webteleport/relay/spec"
 	"github.com/webteleport/utils"
 	qg "github.com/webteleport/webteleport/transport/quic-go"
 )
+
+var _ spec.Upgrader = (*QuicGoUpgrader)(nil)
 
 type QuicGoUpgrader struct {
 	*quic.Listener
@@ -19,7 +22,7 @@ func (s *QuicGoUpgrader) Root() string {
 	return s.HOST
 }
 
-func (s *QuicGoUpgrader) Upgrade() (*Request, error) {
+func (s *QuicGoUpgrader) Upgrade() (*spec.Request, error) {
 	conn, err := s.Listener.Accept(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("accept error: %w", err)
@@ -42,7 +45,7 @@ func (s *QuicGoUpgrader) Upgrade() (*Request, error) {
 		return nil, fmt.Errorf("parse request uri error: %w", err)
 	}
 
-	R := &Request{
+	R := &spec.Request{
 		Session: tssn,
 		Stream:  stm0,
 		Path:    u.Path,

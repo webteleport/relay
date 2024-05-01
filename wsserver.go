@@ -2,9 +2,13 @@ package relay
 
 import (
 	"net/http"
+
+	"github.com/webteleport/relay/spec"
 )
 
-func NewWSServer(host string, store Storage) *WSServer {
+var _ spec.Relayer = (*WSServer)(nil)
+
+func NewWSServer(host string, store spec.Storage) *WSServer {
 	hu := &WebsocketUpgrader{
 		HOST: host,
 	}
@@ -23,8 +27,8 @@ func (s *WSServer) WithPostUpgrade(h http.Handler) *WSServer {
 }
 
 type WSServer struct {
-	Storage
-	HTTPUpgrader
+	spec.Storage
+	spec.HTTPUpgrader
 	Connect     http.Handler
 	PostUpgrade http.Handler
 }
