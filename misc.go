@@ -47,14 +47,12 @@ func (s *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rhost, pw, okk := ProxyBasicAuth(r)
-	tssn, ok := s.GetSession(rhost)
+	rt, ok := s.GetRoundTripper(rhost)
 	if !ok {
 		slog.Warn(fmt.Sprintln("Proxy agent not found:", rhost, pw, okk))
 		DefaultIndex().ServeHTTP(w, r)
 		return
 	}
-
-	s.Visited(rhost)
 
 	if r.Header.Get("Host") == "" {
 		r.Header.Set("Host", r.URL.Host)
@@ -63,7 +61,7 @@ func (s *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	proxyConnection := r.Header.Get("Proxy-Connection")
 	proxyAuthorization := r.Header.Get("Proxy-Authorization")
 
-	rp := ReverseProxy(tssn)
+	rp := ReverseProxy(rt)
 	rp.Rewrite = func(req *httputil.ProxyRequest) {
 		req.SetXForwarded()
 
@@ -115,15 +113,13 @@ func (s *WSServer) IndexHandler(w http.ResponseWriter, r *http.Request) {
 
 	rpath := leadingComponent(r.URL.Path)
 	rhost := fmt.Sprintf("%s.%s", rpath, s.HTTPUpgrader.Root())
-	tssn, ok := s.GetSession(rhost)
+	rt, ok := s.GetRoundTripper(rhost)
 	if !ok {
 		DefaultIndex().ServeHTTP(w, r)
 		return
 	}
 
-	s.Visited(rhost)
-
-	rp := ReverseProxy(tssn)
+	rp := ReverseProxy(rt)
 	rp.Rewrite = func(req *httputil.ProxyRequest) {
 		req.SetXForwarded()
 

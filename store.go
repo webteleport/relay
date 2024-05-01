@@ -288,8 +288,16 @@ func (s *SessionStore) Negotiate(r *spec.Request, root string) (string, error) {
 	return key, nil
 }
 
+func (s *SessionStore) GetRoundTripper(k string) (http.RoundTripper, bool) {
+	tssn, ok := s.GetSession(k)
+	if !ok {
+		return nil, false
+	}
+	return RoundTripper(tssn), true
+}
+
 func (s *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	tssn, ok := s.GetSession(r.Host)
+	rt, ok := s.GetRoundTripper(r.Host)
 	if !ok {
 		utils.HostNotFoundHandler().ServeHTTP(w, r)
 		return
@@ -297,7 +305,7 @@ func (s *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	s.Visited(r.Host)
 
-	rp := ReverseProxy(tssn)
+	rp := ReverseProxy(rt)
 	rp.Rewrite = func(req *httputil.ProxyRequest) {
 		req.SetXForwarded()
 

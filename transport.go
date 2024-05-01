@@ -24,9 +24,9 @@ func RoundTripper(tssn transport.Session) http.RoundTripper {
 	}
 }
 
-func ReverseProxy(tssn transport.Session) *httputil.ReverseProxy {
+func ReverseProxy(rt http.RoundTripper) *httputil.ReverseProxy {
 	return &httputil.ReverseProxy{
-		Transport: RoundTripper(tssn),
+		Transport: rt,
 		ErrorLog:  utils.ReverseProxyLogger(),
 	}
 }
