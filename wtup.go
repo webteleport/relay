@@ -25,14 +25,12 @@ func (s *WebtransportUpgrader) Root() string {
 func (s *WebtransportUpgrader) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ssn, err := s.Server.Upgrade(w, r)
 	if err != nil {
-		w.WriteHeader(500)
 		slog.Warn(fmt.Errorf("webtransport upgrade failed: %w", err).Error())
 	}
 
 	tssn := &webtransport.WebtransportSession{Session: ssn}
 	tstm, err := tssn.Open(context.Background())
 	if err != nil {
-		w.WriteHeader(500)
 		slog.Warn(fmt.Errorf("webtransport stm0 init failed: %w", err).Error())
 	}
 

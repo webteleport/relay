@@ -25,14 +25,12 @@ func (s *WebsocketUpgrader) Root() string {
 func (s *WebsocketUpgrader) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := wsconn.Wrconn(w, r)
 	if err != nil {
-		w.WriteHeader(500)
 		slog.Warn(fmt.Errorf("websocket upgrade failed: %w", err).Error())
 		return
 	}
 
 	ssn, err := common.YamuxClient(conn)
 	if err != nil {
-		w.WriteHeader(500)
 		slog.Warn(fmt.Errorf("websocket creating yamux client failed: %w", err).Error())
 		return
 	}
@@ -40,7 +38,6 @@ func (s *WebsocketUpgrader) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tssn := &websocket.WebsocketSession{Session: ssn}
 	tstm, err := tssn.Open(context.Background())
 	if err != nil {
-		w.WriteHeader(500)
 		slog.Warn(fmt.Errorf("websocket stm0 init failed: %w", err).Error())
 		return
 	}
