@@ -74,7 +74,8 @@ var _ Relayer = (*WSServer)(nil)
 var _ Relayer = (*WTServer)(nil)
 
 type Relayer interface {
-	Storage
-	HTTPUpgrader
+	http.Handler
 	IsUpgrade(r *http.Request) bool
+	Upgrader
+	Storage
 }

@@ -6,11 +6,9 @@ import (
 
 func NewWSServer(host string, store Storage) *WSServer {
 	hu := &WebsocketUpgrader{
-		root: host,
-		reqc: make(chan *Request, 10),
+		HOST: host,
 	}
 	s := &WSServer{
-		HOST:         host,
 		Storage:      store,
 		HTTPUpgrader: hu,
 		Connect:      NewConnectHandler(),
@@ -25,7 +23,6 @@ func (s *WSServer) WithPostUpgrade(h http.Handler) *WSServer {
 }
 
 type WSServer struct {
-	HOST string
 	Storage
 	HTTPUpgrader
 	Connect     http.Handler
@@ -57,7 +54,7 @@ func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WSServer) IsRoot(r *http.Request) bool {
-	return r.Host == s.HOST
+	return r.Host == s.HTTPUpgrader.Root()
 }
 
 func (s *WSServer) IsUpgrade(r *http.Request) (result bool) {

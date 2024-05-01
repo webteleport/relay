@@ -27,34 +27,53 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-var HOST = getEnv("HOST", "localhost:8080")
+var (
+	HOST         = getEnv("HOST", "localhost:8080")
+	PORT         = getEnv("PORT", "8080")
+	TCP_PORT     = getEnv("TCP_PORT", "8081")
+	QUIC_GO_PORT = getEnv("QUIC_GO_PORT", "8082")
+	GO_QUIC_PORT = getEnv("GO_QUIC_PORT", "8083")
+	WS_ADDR      = getEnv("WS_ADDR", "https://relay.example.com")
+)
 
 func main() {
 	log.SetFlags(log.Llongfile)
+	os.Setenv("VERBOSE", "1")
+
 	store := relay.NewSessionStore()
 
-	tcpUpgrader, err := newTcpUpgrader(HOST, "8081")
+	log.Println("HOST:", HOST)
+
+	tcpUpgrader, err := newTcpUpgrader(HOST, TCP_PORT)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Starting server on tcp://127.0.0.1:8081")
+	log.Println("Starting server on tcp://127.0.0.1:" + TCP_PORT)
 	go store.Subscribe(tcpUpgrader)
 
-	quicGoUpgrader, err := newQuicGoUpgrader(HOST, "8082")
+	quicGoUpgrader, err := newQuicGoUpgrader(HOST, QUIC_GO_PORT)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Starting server on quic-go://127.0.0.1:8082")
+	log.Println("Starting server on quic-go://127.0.0.1:" + QUIC_GO_PORT)
 	go store.Subscribe(quicGoUpgrader)
 
-	goQuicUpgrader, err := newGoQuicUpgrader(HOST, "8083")
+	goQuicUpgrader, err := newGoQuicUpgrader(HOST, GO_QUIC_PORT)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Starting server on go-quic://127.0.0.1:8083 [not working yet]")
+	log.Println("[not working yet] Starting server on go-quic://127.0.0.1:" + GO_QUIC_PORT)
 	go store.Subscribe(goQuicUpgrader)
 
+	websocketUpgrader, err := newWebsocketUpgrader(HOST, WS_ADDR)
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Println("Starting server on WS_ADDR:", WS_ADDR)
+		go store.Subscribe(websocketUpgrader)
+	}
+
 	s := relay.NewWSServer(HOST, store)
-	log.Println("Starting server on http://127.0.0.1:8080")
-	http.ListenAndServe(":8080", s)
+	log.Println("Starting server on http://127.0.0.1:" + PORT)
+	http.ListenAndServe(":"+PORT, s)
 }

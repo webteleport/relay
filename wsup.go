@@ -14,12 +14,12 @@ import (
 )
 
 type WebsocketUpgrader struct {
-	root string
+	HOST string
 	reqc chan *Request
 }
 
 func (s *WebsocketUpgrader) Root() string {
-	return s.root
+	return s.HOST
 }
 
 func (s *WebsocketUpgrader) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -53,6 +53,9 @@ func (s *WebsocketUpgrader) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebsocketUpgrader) Upgrade() (*Request, error) {
+	if s.reqc == nil {
+		s.reqc = make(chan *Request, 10)
+	}
 	r, ok := <-s.reqc
 	if !ok {
 		return nil, io.EOF

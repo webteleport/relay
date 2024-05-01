@@ -25,6 +25,7 @@ require (
 require (
 	github.com/digitalocean/godo v1.41.0 // indirect
 	github.com/docker/docker v25.0.1+incompatible // indirect
+	github.com/ebi-yade/altsvc-go v0.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect

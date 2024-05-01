@@ -132,7 +132,7 @@ func (s *WSServer) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rpath := leadingComponent(r.URL.Path)
-	rhost := fmt.Sprintf("%s.%s", rpath, s.HOST)
+	rhost := fmt.Sprintf("%s.%s", rpath, s.HTTPUpgrader.Root())
 	tssn, ok := s.GetSession(rhost)
 	if !ok {
 		DefaultIndex().ServeHTTP(w, r)
