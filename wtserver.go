@@ -23,7 +23,6 @@ func NewWTServer(host string, store Storage) *WTServer {
 		HOST:     host,
 		Storage:  store,
 		Upgrader: hu,
-		Connect:  NewConnectHandler(),
 	}
 	hu.Server.H3 = http3.Server{
 		Handler: s,
@@ -53,27 +52,24 @@ type WTServer struct {
 	HOST string
 	Storage
 	*webtransport.Upgrader
-	Connect     http.Handler
 	PostUpgrade http.Handler
 }
 
 func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if s.IsUpgrade(r) {
-		s.Upgrader.ServeHTTP(w, r)
-		return
-	}
+	s.Dispatch(r).ServeHTTP(w, r)
+}
 
-	if IsConnect(r) {
-		s.ConnectHandler(w, r)
-		return
+func (s *WTServer) Dispatch(r *http.Request) http.Handler {
+	switch {
+	case s.IsUpgrade(r):
+		return s.Upgrader
+	case IsConnect(r):
+		return ConnectHandler
+	case s.PostUpgrade != nil:
+		return s.PostUpgrade
+	default:
+		return s.Storage
 	}
-
-	if s.PostUpgrade != nil {
-		s.PostUpgrade.ServeHTTP(w, r)
-		return
-	}
-
-	s.Storage.ServeHTTP(w, r)
 }
 
 func (s *WTServer) IsRoot(r *http.Request) bool {

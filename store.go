@@ -296,15 +296,11 @@ func (s *SessionStore) GetRoundTripper(k string) (http.RoundTripper, bool) {
 	return RoundTripper(tssn), true
 }
 
-func (s *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *SessionStore) Dispatch(r *http.Request) http.Handler {
 	rt, ok := s.GetRoundTripper(r.Host)
 	if !ok {
-		utils.HostNotFoundHandler().ServeHTTP(w, r)
-		return
+		return utils.HostNotFoundHandler()
 	}
-
-	s.Visited(r.Host)
-
 	rp := ReverseProxy(rt)
 	rp.Rewrite = func(req *httputil.ProxyRequest) {
 		req.SetXForwarded()
@@ -315,8 +311,18 @@ func (s *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// so setting this field currently doesn't have any effect
 		req.Out.URL.Scheme = "http"
 	}
-	rp.ServeHTTP(w, r)
-	expvars.WebteleportRelayStreamsClosed.Add(1)
+	rp.ModifyResponse = func(resp *http.Response) error {
+		s.Visited(r.Host)
+		// TODO
+		// is it ok to assume that the session is closed when the response is received?
+		expvars.WebteleportRelayStreamsClosed.Add(1)
+		return nil
+	}
+	return rp
+}
+
+func (s *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.Dispatch(r).ServeHTTP(w, r)
 }
 
 func (s *SessionStore) Subscribe(upgrader edge.Upgrader) {

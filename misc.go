@@ -24,6 +24,8 @@ func IsConnect(r *http.Request) bool {
 	return r.Header.Get("Proxy-Authorization") != ""
 }
 
+var ConnectHandler = NewConnectHandler()
+
 func NewConnectHandler() http.Handler {
 	if os.Getenv("CONNECT_VERBOSE") != "" {
 		return connectVerbose(connect.Handler)
@@ -40,7 +42,7 @@ func connectVerbose(next http.Handler) http.Handler {
 
 func (s *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("NAIVE") == "" || r.Header.Get("Naive") == "" {
-		s.Connect.ServeHTTP(w, r)
+		ConnectHandler.ServeHTTP(w, r)
 		return
 	}
 
@@ -81,7 +83,7 @@ func (s *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *WTServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("NAIVE") == "" || r.Header.Get("Naive") == "" {
-		s.Connect.ServeHTTP(w, r)
+		ConnectHandler.ServeHTTP(w, r)
 		return
 	}
 }

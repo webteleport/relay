@@ -6,25 +6,37 @@ import (
 	"github.com/webteleport/webteleport/edge"
 )
 
-// transport agnostic in-memory session storage interface
-type Storage interface {
-	// Get Session wrapped by http.Transport
-	GetRoundTripper(k string) (http.RoundTripper, bool)
+// dispatch to other http.Handler implementations
+type Dispatcher interface {
+	Dispatch(r *http.Request) http.Handler
 
-	// Record Info
-	RecordsHandler(w http.ResponseWriter, r *http.Request)
-
-	// Serve HTTP
+	// shortcut to Dispatch(r).ServeHTTP(w, r)
 	http.Handler
-
-	// Subscribe to Upgrader
-	edge.Subscriber
 }
 
-// Relayer is a http.Handler combined with Upgrader and Storage
+// edge.Edge multiplexer with builtin HTTPUpgrader
 type Relayer interface {
-	http.Handler
-	IsUpgrade(r *http.Request) bool
-	edge.Upgrader
+	// dispatch to HTTPUpgrader and Storage
+	Dispatcher
+
+	// builtin HTTPUpgrader
+	edge.HTTPUpgrader
+
+	// edge.Edge multiplexer
 	Storage
+}
+
+// edge.Edge multiplexer
+type Storage interface {
+	// Dispatch to edge.Edge
+	Dispatcher
+
+	// get Session wrapped by http.Transport
+	GetRoundTripper(k string) (http.RoundTripper, bool)
+
+	// record Info
+	RecordsHandler(w http.ResponseWriter, r *http.Request)
+
+	// subscribe to incoming stream of edge.Edge
+	edge.Subscriber
 }

@@ -16,7 +16,6 @@ func NewWSServer(host string, store Storage) *WSServer {
 	s := &WSServer{
 		Storage:      store,
 		HTTPUpgrader: hu,
-		Connect:      NewConnectHandler(),
 	}
 	go store.Subscribe(hu)
 	return s
@@ -30,32 +29,26 @@ func (s *WSServer) WithPostUpgrade(h http.Handler) *WSServer {
 type WSServer struct {
 	Storage
 	edge.HTTPUpgrader
-	Connect     http.Handler
 	PostUpgrade http.Handler
 }
 
 func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if s.IsUpgrade(r) {
-		s.HTTPUpgrader.ServeHTTP(w, r)
-		return
-	}
+	s.Dispatch(r).ServeHTTP(w, r)
+}
 
-	if IsConnect(r) {
-		s.ConnectHandler(w, r)
-		return
+func (s *WSServer) Dispatch(r *http.Request) http.Handler {
+	switch {
+	case s.IsUpgrade(r):
+		return s.HTTPUpgrader
+	case IsConnect(r):
+		return ConnectHandler
+	case s.IsRoot(r):
+		return http.HandlerFunc(s.IndexHandler)
+	case s.PostUpgrade != nil:
+		return s.PostUpgrade
+	default:
+		return s.Storage
 	}
-
-	if s.IsRoot(r) {
-		s.IndexHandler(w, r)
-		return
-	}
-
-	if s.PostUpgrade != nil {
-		s.PostUpgrade.ServeHTTP(w, r)
-		return
-	}
-
-	s.Storage.ServeHTTP(w, r)
 }
 
 func (s *WSServer) IsRoot(r *http.Request) bool {
