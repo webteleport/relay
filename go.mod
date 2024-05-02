@@ -7,7 +7,6 @@ go 1.22.2
 
 require (
 	github.com/btwiuse/connect v0.0.5
-	github.com/btwiuse/multicall v0.0.5
 	github.com/btwiuse/rng v0.0.0
 	github.com/btwiuse/tags v0.0.2
 	github.com/caddyserver/certmagic v0.20.0
@@ -16,17 +15,14 @@ require (
 	github.com/quic-go/webtransport-go v0.8.0
 	github.com/webteleport/utils v0.2.14
 	github.com/webteleport/webteleport v0.5.27
-	github.com/webtransport/quic v0.1.7
 	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f
 	golang.org/x/net v0.24.0
 )
 
 require (
-	github.com/alexpantyukhin/go-pattern-match v0.0.0-20230301210247-d84479c117d7 // indirect
 	github.com/btwiuse/wsconn v0.0.1 // indirect
 	github.com/digitalocean/godo v1.41.0 // indirect
 	github.com/docker/docker v25.0.1+incompatible // indirect
-	github.com/ebi-yade/altsvc-go v0.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
@@ -44,6 +40,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.12.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/rs/cors v1.10.1 // indirect
+	github.com/stretchr/testify v1.8.4 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/mock v0.4.0 // indirect
