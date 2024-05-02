@@ -7,6 +7,7 @@ go 1.22.2
 
 require (
 	github.com/btwiuse/connect v0.0.5
+	github.com/btwiuse/multicall v0.0.5
 	github.com/btwiuse/rng v0.0.0
 	github.com/btwiuse/tags v0.0.2
 	github.com/caddyserver/certmagic v0.20.0
@@ -21,6 +22,7 @@ require (
 )
 
 require (
+	github.com/alexpantyukhin/go-pattern-match v0.0.0-20230301210247-d84479c117d7 // indirect
 	github.com/btwiuse/wsconn v0.0.1 // indirect
 	github.com/digitalocean/godo v1.41.0 // indirect
 	github.com/docker/docker v25.0.1+incompatible // indirect
