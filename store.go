@@ -17,7 +17,7 @@ import (
 
 	"github.com/btwiuse/rng"
 	"github.com/btwiuse/tags"
-	"github.com/webteleport/transport"
+	"github.com/webteleport/webteleport/tunnel"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/edge"
 	"golang.org/x/exp/maps"
@@ -60,7 +60,7 @@ func (s *SessionStore) WebLog(msg string) {
 
 type Record struct {
 	Key     string            `json:"key"`
-	Session transport.Session `json:"-"`
+	Session tunnel.Session `json:"-"`
 	Header  tags.Tags         `json:"header"`
 	Tags    tags.Tags         `json:"tags"`
 	Since   time.Time         `json:"since"`
@@ -124,7 +124,7 @@ func (s *SessionStore) Visited(k string) {
 	s.Lock.Unlock()
 }
 
-func (s *SessionStore) RemoveSession(tssn transport.Session) {
+func (s *SessionStore) RemoveSession(tssn tunnel.Session) {
 	s.Lock.Lock()
 	for k, rec := range s.Record {
 		if rec.Session == tssn {
@@ -140,7 +140,7 @@ func (s *SessionStore) RemoveSession(tssn transport.Session) {
 	expvars.WebteleportRelaySessionsClosed.Add(1)
 }
 
-func (s *SessionStore) GetSession(k string) (transport.Session, bool) {
+func (s *SessionStore) GetSession(k string) (tunnel.Session, bool) {
 	k = utils.StripPort(k)
 	k, _ = idna.ToASCII(k)
 	s.Lock.RLock()

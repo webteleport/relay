@@ -7,11 +7,11 @@ import (
 	"net/http/httputil"
 	"time"
 
-	"github.com/webteleport/transport"
+	"github.com/webteleport/webteleport/tunnel"
 	"github.com/webteleport/utils"
 )
 
-func RoundTripper(tssn transport.Session) http.RoundTripper {
+func RoundTripper(tssn tunnel.Session) http.RoundTripper {
 	dialCtx := func(ctx context.Context, network, addr string) (net.Conn, error) {
 		expvars.WebteleportRelayStreamsSpawned.Add(1)
 		stm, err := tssn.Open(ctx)
