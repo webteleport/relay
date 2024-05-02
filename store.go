@@ -19,7 +19,7 @@ import (
 	"github.com/btwiuse/tags"
 	"github.com/webteleport/transport"
 	"github.com/webteleport/utils"
-	"github.com/webteleport/webteleport/spec"
+	"github.com/webteleport/webteleport/edge"
 	"golang.org/x/exp/maps"
 	"golang.org/x/net/idna"
 )
@@ -152,7 +152,7 @@ func (s *SessionStore) GetSession(k string) (transport.Session, bool) {
 	return nil, false
 }
 
-func (s *SessionStore) Upsert(k string, r *spec.Edge) {
+func (s *SessionStore) Upsert(k string, r *edge.Edge) {
 	k = utils.StripPort(k)
 	k, _ = idna.ToASCII(k)
 
@@ -198,7 +198,7 @@ func (s *SessionStore) Upsert(k string, r *spec.Edge) {
 //
 // This function has been found mostly unnecessary since the disconnect is automatically detected by the
 // underlying transport layer and handled by the Scan function. However, it is kept here for completeness.
-func (s *SessionStore) Ping(r *spec.Edge) {
+func (s *SessionStore) Ping(r *edge.Edge) {
 	for {
 		time.Sleep(s.PingInterval)
 		_, err := io.WriteString(r.Stream, "\n")
@@ -209,7 +209,7 @@ func (s *SessionStore) Ping(r *spec.Edge) {
 	s.RemoveSession(r.Session)
 }
 
-func (s *SessionStore) Scan(r *spec.Edge) {
+func (s *SessionStore) Scan(r *edge.Edge) {
 	scanner := bufio.NewScanner(r.Stream)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -227,7 +227,7 @@ func (s *SessionStore) Scan(r *spec.Edge) {
 	s.RemoveSession(r.Session)
 }
 
-func (s *SessionStore) Allocate(r *spec.Edge, root string) (string, string, error) {
+func (s *SessionStore) Allocate(r *edge.Edge, root string) (string, string, error) {
 	var (
 		candidates = utils.ParseDomainCandidates(r.Path)
 		clobber    = r.Values.Get("clobber")
@@ -269,7 +269,7 @@ func (s *SessionStore) Allocate(r *spec.Edge, root string) (string, string, erro
 	return key, hostname, nil
 }
 
-func (s *SessionStore) Negotiate(r *spec.Edge, root string) (string, error) {
+func (s *SessionStore) Negotiate(r *edge.Edge, root string) (string, error) {
 	key, hp, err := s.Allocate(r, root)
 	if err != nil {
 		// Notify the client of the lease error
@@ -319,7 +319,7 @@ func (s *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	expvars.WebteleportRelayStreamsClosed.Add(1)
 }
 
-func (s *SessionStore) Subscribe(upgrader spec.Upgrader) {
+func (s *SessionStore) Subscribe(upgrader edge.Upgrader) {
 	for {
 		r, err := upgrader.Upgrade()
 		if err == io.EOF {

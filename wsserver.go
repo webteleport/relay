@@ -3,7 +3,7 @@ package relay
 import (
 	"net/http"
 
-	"github.com/webteleport/webteleport/spec"
+	"github.com/webteleport/webteleport/edge"
 	"github.com/webteleport/webteleport/transport/websocket"
 )
 
@@ -29,7 +29,7 @@ func (s *WSServer) WithPostUpgrade(h http.Handler) *WSServer {
 
 type WSServer struct {
 	Storage
-	spec.HTTPUpgrader
+	edge.HTTPUpgrader
 	Connect     http.Handler
 	PostUpgrade http.Handler
 }

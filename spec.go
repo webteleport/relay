@@ -3,7 +3,7 @@ package relay
 import (
 	"net/http"
 
-	"github.com/webteleport/webteleport/spec"
+	"github.com/webteleport/webteleport/edge"
 )
 
 // transport agnostic in-memory session storage interface
@@ -18,13 +18,13 @@ type Storage interface {
 	http.Handler
 
 	// Subscribe to Upgrader
-	spec.Subscriber
+	edge.Subscriber
 }
 
 // Relayer is a http.Handler combined with Upgrader and Storage
 type Relayer interface {
 	http.Handler
 	IsUpgrade(r *http.Request) bool
-	spec.Upgrader
+	edge.Upgrader
 	Storage
 }
