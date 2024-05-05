@@ -14,13 +14,13 @@ require (
 	github.com/quic-go/quic-go v0.43.0
 	github.com/quic-go/webtransport-go v0.8.0
 	github.com/webteleport/utils v0.2.15
-	github.com/webteleport/webteleport v0.5.27
+	github.com/webteleport/webteleport v0.5.28
 	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f
 	golang.org/x/net v0.24.0
 )
 
 require (
-	github.com/btwiuse/wsconn v0.0.1 // indirect
+	github.com/btwiuse/wsconn v0.0.2 // indirect
 	github.com/digitalocean/godo v1.41.0 // indirect
 	github.com/docker/docker v25.0.1+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
