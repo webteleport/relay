@@ -3,6 +3,7 @@ package relay
 import (
 	"net/http"
 
+	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/edge"
 	"github.com/webteleport/webteleport/transport/websocket"
 )
@@ -52,7 +53,7 @@ func (s *WSServer) Dispatch(r *http.Request) http.Handler {
 }
 
 func (s *WSServer) IsRoot(r *http.Request) bool {
-	return r.Host == s.HTTPUpgrader.Root()
+	return utils.StripPort(r.Host) == utils.StripPort(s.HTTPUpgrader.Root())
 }
 
 func (s *WSServer) IsUpgrade(r *http.Request) (result bool) {
