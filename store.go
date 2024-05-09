@@ -17,9 +17,9 @@ import (
 
 	"github.com/btwiuse/rng"
 	"github.com/btwiuse/tags"
-	"github.com/webteleport/webteleport/tunnel"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/edge"
+	"github.com/webteleport/webteleport/tunnel"
 	"golang.org/x/exp/maps"
 	"golang.org/x/net/idna"
 )
@@ -59,13 +59,13 @@ func (s *SessionStore) WebLog(msg string) {
 }
 
 type Record struct {
-	Key     string            `json:"key"`
+	Key     string         `json:"key"`
 	Session tunnel.Session `json:"-"`
-	Header  tags.Tags         `json:"header"`
-	Tags    tags.Tags         `json:"tags"`
-	Since   time.Time         `json:"since"`
-	Visited int               `json:"visited"`
-	IP      string            `json:"ip"`
+	Header  tags.Tags      `json:"header"`
+	Tags    tags.Tags      `json:"tags"`
+	Since   time.Time      `json:"since"`
+	Visited int            `json:"visited"`
+	IP      string         `json:"ip"`
 }
 
 func (r *Record) Matches(kvs url.Values) (ok bool) {
