@@ -345,7 +345,7 @@ func (s *SessionStore) Subscribe(upgrader edge.Upgrader) {
 		key, err := s.Negotiate(r, upgrader.Root())
 		if err != nil {
 			slog.Warn(fmt.Sprintf("negotiate session failed: %s", err))
-			return
+			continue
 		}
 
 		s.Upsert(key, r)
