@@ -7,6 +7,7 @@ go 1.22.2
 
 require (
 	github.com/btwiuse/connect v0.0.5
+	github.com/btwiuse/muxr v0.0.1
 	github.com/btwiuse/rng v0.0.0
 	github.com/btwiuse/tags v0.0.2
 	github.com/caddyserver/certmagic v0.20.0

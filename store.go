@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btwiuse/muxr"
 	"github.com/btwiuse/rng"
 	"github.com/btwiuse/tags"
 	"github.com/webteleport/utils"
@@ -27,7 +28,8 @@ import (
 var _ Storage = (*SessionStore)(nil)
 
 func NewSessionStore() *SessionStore {
-	return &SessionStore{
+	s := &SessionStore{
+		Router:       muxr.NewRouter(),
 		Lock:         &sync.RWMutex{},
 		PingInterval: time.Second * 5,
 		Verbose:      os.Getenv("VERBOSE") != "",
@@ -35,9 +37,12 @@ func NewSessionStore() *SessionStore {
 		Client:       &http.Client{},
 		Record:       map[string]*Record{},
 	}
+	s.Handle("/", DispatcherFunc(s.Dispatch))
+	return s
 }
 
 type SessionStore struct {
+	*muxr.Router
 	Lock         *sync.RWMutex
 	PingInterval time.Duration
 	Verbose      bool
@@ -319,10 +324,6 @@ func (s *SessionStore) Dispatch(r *http.Request) http.Handler {
 		return nil
 	}
 	return rp
-}
-
-func (s *SessionStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.Dispatch(r).ServeHTTP(w, r)
 }
 
 func (s *SessionStore) Subscribe(upgrader edge.Upgrader) {

@@ -43,20 +43,10 @@ func (s *WTServer) WithTLSConfig(tlsConfig *tls.Config) *WTServer {
 	return s
 }
 
-func (s *WTServer) WithPostUpgrade(h http.Handler) *WTServer {
-	s.PostUpgrade = h
-	return s
-}
-
 type WTServer struct {
 	HOST string
 	Storage
 	*webtransport.Upgrader
-	PostUpgrade http.Handler
-}
-
-func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.Dispatch(r).ServeHTTP(w, r)
 }
 
 func (s *WTServer) Dispatch(r *http.Request) http.Handler {
@@ -65,11 +55,13 @@ func (s *WTServer) Dispatch(r *http.Request) http.Handler {
 		return s.Upgrader
 	case IsConnect(r):
 		return ConnectHandler
-	case s.PostUpgrade != nil:
-		return s.PostUpgrade
 	default:
 		return s.Storage
 	}
+}
+
+func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	DispatcherFunc(s.Dispatch).ServeHTTP(w, r)
 }
 
 func (s *WTServer) IsRoot(r *http.Request) bool {
