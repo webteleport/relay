@@ -54,7 +54,7 @@ func (s *WTServer) Dispatch(r *http.Request) http.Handler {
 	case s.IsUpgrade(r):
 		return s.Upgrader
 	case IsConnect(r):
-		return ConnectHandler
+		return AuthenticatedConnectHandler
 	default:
 		return s.Storage
 	}

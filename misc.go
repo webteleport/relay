@@ -21,10 +21,29 @@ func IsConnect(r *http.Request) bool {
 	if r.Method != http.MethodConnect {
 		return false
 	}
-	return r.Header.Get("Proxy-Authorization") != ""
+	return true
 }
 
-var ConnectHandler = NewConnectHandler()
+func ProxyAuthenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := ProxyBasicAuth(r)
+		if !ok || !CheckProxyAuth(user, pass) {
+			w.Header().Set("Proxy-Authenticate", fmt.Sprintf(`Basic realm="%s"`, r.Host))
+			w.WriteHeader(http.StatusProxyAuthRequired)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func CheckProxyAuth(user, pass string) bool {
+	if user == "" || pass == "" {
+		return false
+	}
+	return true
+}
+
+var AuthenticatedConnectHandler = ProxyAuthenticate(NewConnectHandler())
 
 func NewConnectHandler() http.Handler {
 	if os.Getenv("CONNECT_VERBOSE") != "" {
@@ -42,7 +61,7 @@ func connectVerbose(next http.Handler) http.Handler {
 
 func (s *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("NAIVE") == "" || r.Header.Get("Naive") == "" {
-		ConnectHandler.ServeHTTP(w, r)
+		AuthenticatedConnectHandler.ServeHTTP(w, r)
 		return
 	}
 
@@ -83,7 +102,7 @@ func (s *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *WTServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("NAIVE") == "" || r.Header.Get("Naive") == "" {
-		ConnectHandler.ServeHTTP(w, r)
+		AuthenticatedConnectHandler.ServeHTTP(w, r)
 		return
 	}
 }

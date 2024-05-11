@@ -32,7 +32,7 @@ func (s *WSServer) Dispatch(r *http.Request) http.Handler {
 	case s.IsUpgrade(r):
 		return s.HTTPUpgrader
 	case IsConnect(r):
-		return ConnectHandler
+		return AuthenticatedConnectHandler
 	case s.IsRoot(r):
 		return http.HandlerFunc(s.IndexHandler)
 	default:
