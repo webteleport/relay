@@ -49,5 +49,8 @@ func (s *WSServer) IsRoot(r *http.Request) bool {
 }
 
 func (s *WSServer) IsUpgrade(r *http.Request) (result bool) {
-	return r.URL.Query().Get("x-websocket-upgrade") != "" && s.IsRoot(r)
+	isHeader := r.Header.Get(websocket.UpgradeHeader) != ""
+	isQuery := r.URL.Query().Get(websocket.UpgradeQuery) != ""
+	isRoot := s.IsRoot(r)
+	return isRoot && (isHeader || isQuery)
 }

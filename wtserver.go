@@ -69,5 +69,8 @@ func (s *WTServer) IsRoot(r *http.Request) bool {
 }
 
 func (s *WTServer) IsUpgrade(r *http.Request) bool {
-	return r.URL.Query().Get("x-webtransport-upgrade") != "" && s.IsRoot(r)
+	isHeader := r.Header.Get(webtransport.UpgradeHeader) != ""
+	isQuery := r.URL.Query().Get(webtransport.UpgradeQuery) != ""
+	isRoot := s.IsRoot(r)
+	return isRoot && (isHeader || isQuery)
 }
