@@ -13,9 +13,15 @@ import (
 	"github.com/webteleport/utils"
 )
 
-// authenticated h1/h2/h3 connect requests or forward requests
-func IsAuthenticatedProxy(r *http.Request) bool {
-	return r.Header.Get("Proxy-Authorization") != ""
+// h1/h2/h3 connect requests or forward requests
+func IsProxy(r *http.Request) bool {
+	if r.Header.Get("Proxy-Connection") != "" {
+		return true
+	}
+	if r.Method == http.MethodConnect {
+		return true
+	}
+	return false
 }
 
 func ProxyAuthenticate(next http.Handler) http.Handler {
