@@ -3,25 +3,19 @@ package relay
 import (
 	"expvar"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"os"
 	"strings"
 
 	"github.com/btwiuse/connect"
+	"github.com/btwiuse/forward"
 	"github.com/webteleport/utils"
 )
 
-// when env CONNECT is set, filter authenticated h1/h2/h3 connect requests
-func IsConnect(r *http.Request) bool {
-	if os.Getenv("CONNECT") == "" {
-		return false
-	}
-	if r.Method != http.MethodConnect {
-		return false
-	}
-	return true
+// authenticated h1/h2/h3 connect requests or forward requests
+func IsAuthenticatedProxy(r *http.Request) bool {
+	return r.Header.Get("Proxy-Authorization") != ""
 }
 
 func ProxyAuthenticate(next http.Handler) http.Handler {
@@ -43,68 +37,29 @@ func CheckProxyAuth(user, pass string) bool {
 	return true
 }
 
-var AuthenticatedConnectHandler = ProxyAuthenticate(NewConnectHandler())
+var AuthenticatedProxyHandler = ConnectVerbose(ProxyAuthenticate(NewProxyHandler()))
 
-func NewConnectHandler() http.Handler {
-	if os.Getenv("CONNECT_VERBOSE") != "" {
-		return connectVerbose(connect.Handler)
+func ProxyDispatcher(r *http.Request) http.Handler {
+	switch r.Method {
+	case http.MethodConnect:
+		return connect.Handler
+	default:
+		return forward.Handler
 	}
-	return connect.Handler
 }
 
-func connectVerbose(next http.Handler) http.Handler {
+func NewProxyHandler() http.Handler {
+	return DispatcherFunc(ProxyDispatcher)
+}
+
+func ConnectVerbose(next http.Handler) http.Handler {
+	if os.Getenv("CONNECT_VERBOSE") == "" {
+		return next
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		println(r.Proto, r.Host, r.Header)
+		println(r.Method, r.Proto, r.Host, r.Header)
 		next.ServeHTTP(w, r)
 	})
-}
-
-func (s *WSServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
-	if os.Getenv("NAIVE") == "" || r.Header.Get("Naive") == "" {
-		AuthenticatedConnectHandler.ServeHTTP(w, r)
-		return
-	}
-
-	rhost, pw, okk := ProxyBasicAuth(r)
-	rt, ok := s.GetRoundTripper(rhost)
-	if !ok {
-		slog.Warn(fmt.Sprintln("Proxy agent not found:", rhost, pw, okk))
-		DefaultIndex().ServeHTTP(w, r)
-		return
-	}
-
-	if r.Header.Get("Host") == "" {
-		r.Header.Set("Host", r.URL.Host)
-	}
-
-	proxyConnection := r.Header.Get("Proxy-Connection")
-	proxyAuthorization := r.Header.Get("Proxy-Authorization")
-
-	rp := ReverseProxy(rt)
-	rp.Rewrite = func(req *httputil.ProxyRequest) {
-		req.SetXForwarded()
-
-		req.Out.URL.Host = r.Host
-		// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
-		// However, reverseproxy doesn't support webtransport yet
-		// so setting this field currently doesn't have any effect
-		req.Out.URL.Scheme = "http"
-		req.Out.Header.Set("Proxy-Connection", proxyConnection)
-		req.Out.Header.Set("Proxy-Authorization", proxyAuthorization)
-	}
-	println("proxy::open")
-	// TODO: proxy request will stuck here
-	// so for now this feature is not working
-	rp.ServeHTTP(w, r)
-	println("proxy::returned")
-	expvars.WebteleportRelayStreamsClosed.Add(1)
-}
-
-func (s *WTServer) ConnectHandler(w http.ResponseWriter, r *http.Request) {
-	if os.Getenv("NAIVE") == "" || r.Header.Get("Naive") == "" {
-		AuthenticatedConnectHandler.ServeHTTP(w, r)
-		return
-	}
 }
 
 func DefaultIndex() http.Handler {

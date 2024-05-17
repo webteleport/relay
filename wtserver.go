@@ -53,8 +53,8 @@ func (s *WTServer) Dispatch(r *http.Request) http.Handler {
 	switch {
 	case s.IsUpgrade(r):
 		return s.Upgrader
-	case IsConnect(r):
-		return AuthenticatedConnectHandler
+	case IsAuthenticatedProxy(r):
+		return AuthenticatedProxyHandler
 	default:
 		return s.Storage
 	}

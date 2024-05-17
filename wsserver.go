@@ -31,8 +31,8 @@ func (s *WSServer) Dispatch(r *http.Request) http.Handler {
 	switch {
 	case s.IsUpgrade(r):
 		return s.HTTPUpgrader
-	case IsConnect(r):
-		return AuthenticatedConnectHandler
+	case IsAuthenticatedProxy(r):
+		return AuthenticatedProxyHandler
 	case s.IsRoot(r):
 		return http.HandlerFunc(s.IndexHandler)
 	default:
