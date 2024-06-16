@@ -11,10 +11,10 @@ require (
 	github.com/btwiuse/muxr v0.0.1
 	github.com/btwiuse/rng v0.0.0
 	github.com/btwiuse/tags v0.0.2
-	github.com/quic-go/quic-go v0.44.0
+	github.com/quic-go/quic-go v0.45.0
 	github.com/quic-go/webtransport-go v0.8.0
 	github.com/webteleport/utils v0.2.15
-	github.com/webteleport/webteleport v0.5.31
+	github.com/webteleport/webteleport v0.5.32
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842
 	golang.org/x/net v0.25.0
 )
