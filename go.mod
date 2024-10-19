@@ -9,7 +9,7 @@ require (
 	github.com/btwiuse/connect v0.0.5
 	github.com/btwiuse/forward v0.0.0
 	github.com/btwiuse/muxr v0.0.1
-	github.com/btwiuse/rng v0.0.0
+	github.com/btwiuse/rng v0.0.1
 	github.com/btwiuse/tags v0.0.2
 	github.com/quic-go/quic-go v0.48.0
 	github.com/quic-go/webtransport-go v0.8.1-0.20241018022711-4ac2c9250e66
