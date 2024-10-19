@@ -1,6 +1,6 @@
 module github.com/webteleport/relay
 
-go 1.22.2
+go 1.23.2
 
 // replace github.com/webteleport/webteleport => ../webteleport
 // replace github.com/webteleport/utils => ../utils
@@ -11,12 +11,12 @@ require (
 	github.com/btwiuse/muxr v0.0.1
 	github.com/btwiuse/rng v0.0.0
 	github.com/btwiuse/tags v0.0.2
-	github.com/quic-go/quic-go v0.45.0
-	github.com/quic-go/webtransport-go v0.8.0
-	github.com/webteleport/utils v0.2.15
-	github.com/webteleport/webteleport v0.5.32
-	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842
-	golang.org/x/net v0.25.0
+	github.com/quic-go/quic-go v0.48.0
+	github.com/quic-go/webtransport-go v0.8.1-0.20241018022711-4ac2c9250e66
+	github.com/webteleport/utils v0.2.16
+	github.com/webteleport/webteleport v0.5.33
+	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
+	golang.org/x/net v0.30.0
 )
 
 require (
@@ -30,17 +30,16 @@ require (
 	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/miekg/dns v1.1.59 // indirect
+	github.com/miekg/dns v1.1.62 // indirect
 	github.com/onsi/ginkgo/v2 v2.12.0 // indirect
-	github.com/quic-go/qpack v0.4.0 // indirect
-	github.com/rs/cors v1.10.1 // indirect
-	github.com/stretchr/testify v1.8.4 // indirect
+	github.com/quic-go/qpack v0.5.1 // indirect
+	github.com/rs/cors v1.11.1 // indirect
 	go.uber.org/mock v0.4.0 // indirect
-	golang.org/x/crypto v0.23.0 // indirect
-	golang.org/x/mod v0.17.0 // indirect
-	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
-	golang.org/x/text v0.15.0 // indirect
-	golang.org/x/tools v0.21.0 // indirect
-	nhooyr.io/websocket v1.8.11 // indirect
+	golang.org/x/crypto v0.28.0 // indirect
+	golang.org/x/mod v0.21.0 // indirect
+	golang.org/x/sync v0.8.0 // indirect
+	golang.org/x/sys v0.26.0 // indirect
+	golang.org/x/text v0.19.0 // indirect
+	golang.org/x/tools v0.26.0 // indirect
+	nhooyr.io/websocket v1.8.17 // indirect
 )
