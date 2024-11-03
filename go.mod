@@ -11,23 +11,23 @@ require (
 	github.com/btwiuse/muxr v0.0.1
 	github.com/btwiuse/rng v0.0.1
 	github.com/btwiuse/tags v0.0.2
-	github.com/quic-go/quic-go v0.48.0
+	github.com/quic-go/quic-go v0.48.1
 	github.com/quic-go/webtransport-go v0.8.1-0.20241018022711-4ac2c9250e66
 	github.com/webteleport/utils v0.2.16
-	github.com/webteleport/webteleport v0.5.33
+	github.com/webteleport/webteleport v0.5.34
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
 	golang.org/x/net v0.30.0
 )
 
 require (
-	github.com/btwiuse/wsconn v0.0.2 // indirect
+	github.com/btwiuse/wsconn v0.0.3 // indirect
 	github.com/docker/docker v27.3.1+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/google/pprof v0.0.0-20230821062121-407c9e7a662f // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
-	github.com/gorilla/websocket v1.5.1 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/miekg/dns v1.1.62 // indirect
