@@ -31,12 +31,14 @@ func (s *WSServer) Dispatch(r *http.Request) http.Handler {
 	switch {
 	case s.IsUpgrade(r):
 		return s.HTTPUpgrader
+	case s.IsRootInternal(r):
+		return http.HandlerFunc(s.RootInternalHandler)
 	case IsInternal(r):
 		return http.HandlerFunc(handleInternal)
+	case s.IsRoot(r):
+		return http.HandlerFunc(s.RootHandler)
 	case IsProxy(r):
 		return AuthenticatedProxyHandler
-	case s.IsRoot(r):
-		return http.HandlerFunc(s.IndexHandler)
 	default:
 		return s.Storage
 	}
@@ -48,6 +50,10 @@ func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *WSServer) IsRoot(r *http.Request) bool {
 	return utils.StripPort(r.Host) == utils.StripPort(s.HTTPUpgrader.Root())
+}
+
+func (s *WSServer) IsRootInternal(r *http.Request) bool {
+	return utils.StripPort(r.Host) == ROOT_INTERNAL
 }
 
 func (s *WSServer) IsUpgrade(r *http.Request) (result bool) {

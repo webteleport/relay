@@ -13,6 +13,8 @@ import (
 	"github.com/webteleport/utils"
 )
 
+const ROOT_INTERNAL = "root.internal"
+
 // h1/h2/h3 connect requests or forward requests
 func IsProxy(r *http.Request) bool {
 	if r.Header.Get("Proxy-Connection") != "" {
@@ -96,17 +98,22 @@ func leadingComponent(s string) string {
 	return strings.Split(strings.TrimPrefix(s, "/"), "/")[0]
 }
 
-func (s *WSServer) IndexHandler(w http.ResponseWriter, r *http.Request) {
-	if dbgvars := os.Getenv("DEBUG_VARS_PATH"); dbgvars != "" && r.URL.Path == dbgvars {
+func (s *WSServer) RootInternalHandler(w http.ResponseWriter, r *http.Request) {
+	if dbgvars := os.Getenv("INTERNAL_DEBUG_VARS_PATH"); dbgvars != "" && r.URL.Path == dbgvars {
 		expvar.Handler().ServeHTTP(w, r)
 		return
 	}
 
-	if apisess := os.Getenv("API_SESSIONS_PATH"); apisess != "" && r.URL.Path == apisess {
+	if apisess := os.Getenv("INTERNAL_API_SESSIONS_PATH"); apisess != "" && r.URL.Path == apisess {
 		s.RecordsHandler(w, r)
 		return
 	}
 
+	http.NotFound(w, r)
+}
+
+// rewrite requests targeting example.com/sub/* to sub.example.com/*
+func (s *WSServer) RootHandler(w http.ResponseWriter, r *http.Request) {
 	rpath := leadingComponent(r.URL.Path)
 	rhost := fmt.Sprintf("%s.%s", rpath, s.HTTPUpgrader.Root())
 	rt, ok := s.GetRoundTripper(rhost)

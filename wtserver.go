@@ -14,13 +14,11 @@ var _ Relayer = (*WTServer)(nil)
 
 func NewWTServer(host string, store Storage) *WTServer {
 	hu := &webtransport.Upgrader{
-		HOST: host,
 		Server: &wt.Server{
 			CheckOrigin: func(*http.Request) bool { return true },
 		},
 	}
 	s := &WTServer{
-		HOST:     host,
 		Storage:  store,
 		Upgrader: hu,
 	}
@@ -44,7 +42,6 @@ func (s *WTServer) WithTLSConfig(tlsConfig *tls.Config) *WTServer {
 }
 
 type WTServer struct {
-	HOST string
 	Storage
 	*webtransport.Upgrader
 }
@@ -53,8 +50,6 @@ func (s *WTServer) Dispatch(r *http.Request) http.Handler {
 	switch {
 	case s.IsUpgrade(r):
 		return s.Upgrader
-	case IsInternal(r):
-		return http.HandlerFunc(handleInternal)
 	case IsProxy(r):
 		return AuthenticatedProxyHandler
 	default:
@@ -67,7 +62,11 @@ func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WTServer) IsRoot(r *http.Request) bool {
-	return utils.StripPort(r.Host) == utils.StripPort(s.HOST)
+	return utils.StripPort(r.Host) == utils.StripPort(s.Upgrader.Root())
+}
+
+func (s *WTServer) IsRootInternal(r *http.Request) bool {
+	return utils.StripPort(r.Host) == ROOT_INTERNAL
 }
 
 func (s *WTServer) IsUpgrade(r *http.Request) bool {
