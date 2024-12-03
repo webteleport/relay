@@ -46,18 +46,34 @@ func CheckProxyAuth(user, pass string) bool {
 var AuthenticatedProxyHandler = ConnectVerbose(ProxyAuthenticate(NewProxyHandler()))
 
 func ProxyDispatcher(r *http.Request) http.Handler {
-	switch r.Method {
-	case http.MethodConnect:
+	switch {
+	// HTTPS or WS/WSS target
+	case r.Method == http.MethodConnect:
 		return connect.Handler
+	// Plain HTTP target
 	default:
 		return forward.Handler
 	}
+}
+
+// TODO: handle ws://.internal CONNECT requests
+func handleInternal(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	msg := r.Method + " " + r.Host
+	println(msg)
+	http.Error(w, msg, http.StatusOK)
+}
+
+func IsInternal(r *http.Request) bool {
+	return strings.HasSuffix(utils.StripPort(r.Host), ".internal")
 }
 
 func NewProxyHandler() http.Handler {
 	return DispatcherFunc(ProxyDispatcher)
 }
 
+// ConnectVerbose is a misnomer
+// It also logs plain HTTP proxy requests, which do not have CONNECT method
 func ConnectVerbose(next http.Handler) http.Handler {
 	if os.Getenv("CONNECT_VERBOSE") == "" {
 		return next

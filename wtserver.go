@@ -53,6 +53,8 @@ func (s *WTServer) Dispatch(r *http.Request) http.Handler {
 	switch {
 	case s.IsUpgrade(r):
 		return s.Upgrader
+	case IsInternal(r):
+		return http.HandlerFunc(handleInternal)
 	case IsProxy(r):
 		return AuthenticatedProxyHandler
 	default:

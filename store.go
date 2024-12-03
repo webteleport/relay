@@ -37,7 +37,7 @@ func NewSessionStore() *SessionStore {
 		Client:       &http.Client{},
 		Record:       map[string]*Record{},
 	}
-	s.Handle("/", DispatcherFunc(s.Dispatch))
+	s.Router.Handle("/", DispatcherFunc(s.Dispatch))
 	return s
 }
 
@@ -232,7 +232,7 @@ func (s *SessionStore) Scan(r *edge.Edge) {
 	s.RemoveSession(r.Session)
 }
 
-func (s *SessionStore) Allocate(r *edge.Edge, root string) (string, string, error) {
+func (s *SessionStore) Allocate(r *edge.Edge, root string) (string, bool, error) {
 	var (
 		candidates = utils.ParseDomainCandidates(r.Path)
 		clobber    = r.Values.Get("clobber")
@@ -261,21 +261,29 @@ func (s *SessionStore) Allocate(r *edge.Edge, root string) (string, string, erro
 	}
 	if sub == "" {
 		err := fmt.Errorf("none available: %v", candidates)
-		return "", "", err
+		return "", false, err
 	}
 
-	hostname := fmt.Sprintf("%s.%s", sub, root)
-	hostnamePath := fmt.Sprintf("%s/%s/", root, sub)
-	key := hostname
+	isSubpath := strings.HasSuffix(r.Path, "/") && r.Path != "/"
 
-	if strings.HasSuffix(r.Path, "/") && r.Path != "/" {
-		return key, hostnamePath, nil
+	return sub, isSubpath, nil
+}
+
+func hostWithOptionalPath(root, sub string, isSubpath bool) string {
+	// example.com/sub/ -> example.com/sub/
+	if isSubpath {
+		return fmt.Sprintf("%s/%s/", root, sub)
 	}
-	return key, hostname, nil
+	// example.com/sub -> sub.example.com
+	return hostKey(root, sub)
+}
+
+func hostKey(root, sub string) string {
+	return fmt.Sprintf("%s.%s", sub, root)
 }
 
 func (s *SessionStore) Negotiate(r *edge.Edge, root string) (string, error) {
-	key, hp, err := s.Allocate(r, root)
+	sub, isSubpath, err := s.Allocate(r, root)
 	if err != nil {
 		// Notify the client of the lease error
 		_, err1 := io.WriteString(r.Stream, fmt.Sprintf("ERR %s\n", err))
@@ -283,14 +291,18 @@ func (s *SessionStore) Negotiate(r *edge.Edge, root string) (string, error) {
 			return "", err1
 		}
 		return "", err
-	} else {
-		// Notify the client of the hostname/path
-		_, err1 := io.WriteString(r.Stream, fmt.Sprintf("HOST %s\n", hp))
-		if err1 != nil {
-			return "", err1
-		}
 	}
-	return key, nil
+
+	hKey := hostKey(root, sub)
+	hPath := hostWithOptionalPath(root, sub, isSubpath)
+
+	// Notify the client of the hostname/path
+	_, err1 := io.WriteString(r.Stream, fmt.Sprintf("HOST %s\n", hPath))
+	if err1 != nil {
+		return "", err1
+	}
+
+	return hKey, nil
 }
 
 func (s *SessionStore) GetRoundTripper(k string) (http.RoundTripper, bool) {
