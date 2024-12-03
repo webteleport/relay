@@ -71,6 +71,8 @@ type Record struct {
 	Since   time.Time      `json:"since"`
 	Visited int            `json:"visited"`
 	IP      string         `json:"ip"`
+	Path    string         `json:"path"`
+	OnionID string         `json:"onion_id"`
 }
 
 func (r *Record) Matches(kvs url.Values) (ok bool) {
@@ -172,6 +174,8 @@ func (s *SessionStore) Upsert(k string, r *edge.Edge) {
 		Visited: 0,
 		Key:     k,
 		IP:      r.RealIP,
+		Path:    r.Path,
+		OnionID: deriveOnionID(r.Path),
 	}
 
 	s.Lock.Lock()
