@@ -31,8 +31,8 @@ func newQuicGoUpgrader(host string, port string) (*qg.Upgrader, error) {
 	}
 
 	upgrader := &qg.Upgrader{
-		Listener: qln,
-		HOST:     host,
+		Listener:     qln,
+		RootPatterns: []string{host},
 	}
 	return upgrader, nil
 }

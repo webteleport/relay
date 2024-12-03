@@ -33,7 +33,7 @@ var (
 	TCP_PORT     = getEnv("TCP_PORT", "8081")
 	QUIC_GO_PORT = getEnv("QUIC_GO_PORT", "8082")
 	GO_QUIC_PORT = getEnv("GO_QUIC_PORT", "8083")
-	WS_ADDR      = getEnv("WS_ADDR", "https://relay.example.com")
+	RELAY        = getEnv("RELAY", "https://relay.example.com")
 )
 
 func main() {
@@ -65,11 +65,11 @@ func main() {
 	log.Println("[not working yet] Starting server on go-quic://127.0.0.1:" + GO_QUIC_PORT)
 	go store.Subscribe(goQuicUpgrader)
 
-	websocketUpgrader, err := newWebsocketUpgrader(HOST, WS_ADDR)
+	websocketUpgrader, err := newWebsocketUpgrader(HOST, RELAY)
 	if err != nil {
 		log.Println(err)
 	} else {
-		log.Println("Starting server on WS_ADDR:", WS_ADDR)
+		log.Println("Starting server on relay:", RELAY)
 		go store.Subscribe(websocketUpgrader)
 	}
 

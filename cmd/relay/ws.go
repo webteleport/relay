@@ -16,7 +16,7 @@ func newWebsocketUpgrader(host string, addr string) (*websocket.Upgrader, error)
 	}
 	log.Println("Websocket server listening on https://" + ln.Addr().String())
 	upgrader := &websocket.Upgrader{
-		HOST: host,
+		RootPatterns: []string{host},
 	}
 	go http.Serve(ln, upgrader)
 	return upgrader, nil

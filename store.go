@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/btwiuse/muxr"
-	"github.com/btwiuse/rng"
 	"github.com/btwiuse/tags"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/edge"
@@ -36,7 +35,6 @@ func NewSessionStore() *SessionStore {
 		Webhook:      os.Getenv("WEBHOOK"),
 		Client:       &http.Client{},
 		Record:       map[string]*Record{},
-		OnionRecord:  map[string]*Record{},
 	}
 	s.Router.Handle("/", DispatcherFunc(s.Dispatch))
 	return s
@@ -50,7 +48,6 @@ type SessionStore struct {
 	Webhook      string
 	Client       *http.Client
 	Record       map[string]*Record
-	OnionRecord  map[string]*Record
 }
 
 func (s *SessionStore) WebLog(msg string) {
@@ -74,7 +71,6 @@ type Record struct {
 	Visited int            `json:"visited"`
 	IP      string         `json:"ip"`
 	Path    string         `json:"path"`
-	OnionID string         `json:"onion_id"`
 }
 
 func (r *Record) Matches(kvs url.Values) (ok bool) {
@@ -125,6 +121,7 @@ func (s *SessionStore) RecordsHandler(w http.ResponseWriter, r *http.Request) {
 func (s *SessionStore) Visited(k string) {
 	k = utils.StripPort(k)
 	k, _ = idna.ToASCII(k)
+	k = strings.Split(k, ".")[0]
 	s.Lock.Lock()
 	rec, ok := s.Record[k]
 	if ok {
@@ -138,11 +135,10 @@ func (s *SessionStore) RemoveSession(tssn tunnel.Session) {
 	for _, rec := range s.Record {
 		if rec.Session == tssn {
 			delete(s.Record, rec.Key)
-			delete(s.OnionRecord, rec.OnionID)
 			if s.Verbose {
 				slog.Info("remove", "key", rec.Key)
 			}
-			s.WebLog(fmt.Sprintf("remove/%s?ip=%s&onion_id=%s", rec.Key, rec.IP, rec.OnionID))
+			s.WebLog(fmt.Sprintf("remove/%s?ip=%s", rec.Key, rec.IP))
 			break
 		}
 	}
@@ -150,22 +146,10 @@ func (s *SessionStore) RemoveSession(tssn tunnel.Session) {
 	expvars.WebteleportRelaySessionsClosed.Add(1)
 }
 
-func (s *SessionStore) GetOnionSession(k string) (tunnel.Session, bool) {
-	k = utils.StripPort(k)
+func (s *SessionStore) GetSession(h string) (tunnel.Session, bool) {
+	k := utils.StripPort(h)
 	k, _ = idna.ToASCII(k)
 	k = strings.Split(k, ".")[0]
-	s.Lock.RLock()
-	rec, ok := s.OnionRecord[k]
-	s.Lock.RUnlock()
-	if ok {
-		return rec.Session, true
-	}
-	return nil, false
-}
-
-func (s *SessionStore) GetSession(k string) (tunnel.Session, bool) {
-	k = utils.StripPort(k)
-	k, _ = idna.ToASCII(k)
 	s.Lock.RLock()
 	rec, ok := s.Record[k]
 	s.Lock.RUnlock()
@@ -176,28 +160,23 @@ func (s *SessionStore) GetSession(k string) (tunnel.Session, bool) {
 }
 
 func (s *SessionStore) Upsert(k string, r *edge.Edge) {
-	k = utils.StripPort(k)
-	k, _ = idna.ToASCII(k)
-
 	since := time.Now()
 	header := tags.Tags{Values: url.Values(r.Header)}
 	tags := tags.Tags{Values: r.Values}
 	rec := &Record{
+		Key:     k,
 		Session: r.Session,
 		Header:  header,
 		Tags:    tags,
 		Since:   since,
 		Visited: 0,
-		Key:     k,
 		IP:      r.RealIP,
 		Path:    r.Path,
-		OnionID: deriveOnionID(r.Path),
 	}
 
 	s.Lock.Lock()
-	_, has := s.Record[rec.Key]
-	s.Record[rec.Key] = rec
-	s.OnionRecord[rec.OnionID] = rec
+	_, has := s.Record[k]
+	s.Record[k] = rec
 	s.Lock.Unlock()
 
 	action := ""
@@ -207,9 +186,9 @@ func (s *SessionStore) Upsert(k string, r *edge.Edge) {
 		action = "insert"
 	}
 	if s.Verbose {
-		slog.Info(action, "key", rec.Key, "ip", rec.IP, "onion_id", rec.OnionID)
+		slog.Info(action, "key", rec.Key, "ip", rec.IP)
 	}
-	s.WebLog(fmt.Sprintf("%s/%s?ip=%s&onion_id=%s", action, rec.Key, rec.IP, rec.OnionID))
+	s.WebLog(fmt.Sprintf("%s/%s?ip=%s", action, rec.Key, rec.IP))
 
 	if os.Getenv("PING") != "" {
 		go s.Ping(r)
@@ -253,91 +232,22 @@ func (s *SessionStore) Scan(r *edge.Edge) {
 	s.RemoveSession(r.Session)
 }
 
-func (s *SessionStore) Allocate(r *edge.Edge, root string) (string, bool, error) {
-	var (
-		candidates = utils.ParseDomainCandidates(r.Path)
-		clobber    = r.Values.Get("clobber")
-	)
+func (s *SessionStore) Allocate(r *edge.Edge) (string, error) {
+	k := deriveOnionID(r.Path)
 
-	sub := ""
-	if len(candidates) == 0 {
-		sub = rng.NewDockerSepDigits("-", 4)
-	} else {
-		// Try to lease the first available subdomain if candidates are provided
-		for _, pfx := range candidates {
-			k := fmt.Sprintf("%s.%s", pfx, root)
-			s.Lock.RLock()
-			rec, exist := s.Record[k]
-			s.Lock.RUnlock()
-
-			insert := !exist
-			updateByIP := exist && clobber == "" && rec.IP == r.RealIP
-			updateByClobber := exist && clobber != "" && rec.Tags.Get("clobber") == clobber
-
-			if upsert := insert || updateByIP || updateByClobber; upsert {
-				sub = pfx
-				break
-			}
-		}
-	}
-	if sub == "" {
-		err := fmt.Errorf("none available: %v", candidates)
-		return "", false, err
-	}
-
-	isSubpath := strings.HasSuffix(r.Path, "/") && r.Path != "/"
-
-	return sub, isSubpath, nil
-}
-
-func hostWithOptionalPath(root, sub string, isSubpath bool) string {
-	// example.com/sub/ -> example.com/sub/
-	if isSubpath {
-		return fmt.Sprintf("%s/%s/", root, sub)
-	}
-	// example.com/sub -> sub.example.com
-	return hostKey(root, sub)
-}
-
-func hostKey(root, sub string) string {
-	return fmt.Sprintf("%s.%s", sub, root)
-}
-
-func (s *SessionStore) Negotiate(r *edge.Edge, root string) (string, error) {
-	sub, isSubpath, err := s.Allocate(r, root)
+	// Notify the client of the allocated hostname
+	_, err := io.WriteString(r.Stream, fmt.Sprintf("HOST %s\n", k))
 	if err != nil {
-		// Notify the client of the lease error
-		_, err1 := io.WriteString(r.Stream, fmt.Sprintf("ERR %s\n", err))
-		if err1 != nil {
-			return "", err1
-		}
 		return "", err
 	}
 
-	hKey := hostKey(root, sub)
-	hPath := hostWithOptionalPath(root, sub, isSubpath)
-
-	// Notify the client of the hostname/path
-	_, err1 := io.WriteString(r.Stream, fmt.Sprintf("HOST %s\n", hPath))
-	if err1 != nil {
-		return "", err1
-	}
-
-	return hKey, nil
+	return k, nil
 }
 
-func (s *SessionStore) GetOnionRoundTripper(k string) (http.RoundTripper, bool) {
-	tssn, ok := s.GetOnionSession(k)
+func (s *SessionStore) GetRoundTripper(h string) (http.RoundTripper, bool) {
+	tssn, ok := s.GetSession(h)
 	if !ok {
 		return nil, false
-	}
-	return RoundTripper(tssn), true
-}
-
-func (s *SessionStore) GetRoundTripper(k string) (http.RoundTripper, bool) {
-	tssn, ok := s.GetSession(k)
-	if !ok {
-		return s.GetOnionRoundTripper(k)
 	}
 	return RoundTripper(tssn), true
 }
@@ -384,9 +294,9 @@ func (s *SessionStore) Subscribe(upgrader edge.Upgrader) {
 			slog.Info("subscribe", "request", r)
 		}
 
-		key, err := s.Negotiate(r, upgrader.Root())
+		key, err := s.Allocate(r)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("negotiate session failed: %s", err))
+			slog.Warn(fmt.Sprintf("allocate hostname failed: %s", err))
 			continue
 		}
 

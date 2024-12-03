@@ -12,7 +12,7 @@ var _ Relayer = (*WSServer)(nil)
 
 func NewWSServer(host string, store Storage) *WSServer {
 	hu := &websocket.Upgrader{
-		HOST: host,
+		RootPatterns: []string{host},
 	}
 	s := &WSServer{
 		Storage:      store,
@@ -35,7 +35,7 @@ func (s *WSServer) Dispatch(r *http.Request) http.Handler {
 		return http.HandlerFunc(s.RootInternalHandler)
 	case IsInternal(r):
 		return http.HandlerFunc(handleInternal)
-	case s.IsRoot(r):
+	case s.IsRootExternal(r):
 		return http.HandlerFunc(s.RootHandler)
 	case IsProxy(r):
 		return AuthenticatedProxyHandler
@@ -48,8 +48,8 @@ func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	DispatcherFunc(s.Dispatch).ServeHTTP(w, r)
 }
 
-func (s *WSServer) IsRoot(r *http.Request) bool {
-	return utils.StripPort(r.Host) == utils.StripPort(s.HTTPUpgrader.Root())
+func (s *WSServer) IsRootExternal(r *http.Request) bool {
+	return s.HTTPUpgrader.IsRoot(utils.StripPort(r.Host))
 }
 
 func (s *WSServer) IsRootInternal(r *http.Request) bool {
@@ -59,6 +59,6 @@ func (s *WSServer) IsRootInternal(r *http.Request) bool {
 func (s *WSServer) IsUpgrade(r *http.Request) (result bool) {
 	isHeader := r.Header.Get(websocket.UpgradeHeader) != ""
 	isQuery := r.URL.Query().Get(websocket.UpgradeQuery) != ""
-	isRoot := s.IsRoot(r)
+	isRoot := s.IsRootExternal(r)
 	return isRoot && (isHeader || isQuery)
 }

@@ -12,8 +12,8 @@ func newTcpUpgrader(host string, port string) (*tcp.Upgrader, error) {
 		return nil, err
 	}
 	upgrader := &tcp.Upgrader{
-		Listener: ln,
-		HOST:     host,
+		Listener:     ln,
+		RootPatterns: []string{host},
 	}
 	return upgrader, nil
 }

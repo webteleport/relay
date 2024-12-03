@@ -27,8 +27,8 @@ func newGoQuicUpgrader(host string, port string) (*gq.Upgrader, error) {
 	}
 
 	upgrader := &gq.Upgrader{
-		Listener: qln,
-		HOST:     host,
+		Listener:     qln,
+		RootPatterns: []string{host},
 	}
 	return upgrader, nil
 }

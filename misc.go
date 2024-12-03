@@ -115,7 +115,8 @@ func (s *WSServer) RootInternalHandler(w http.ResponseWriter, r *http.Request) {
 // rewrite requests targeting example.com/sub/* to sub.example.com/*
 func (s *WSServer) RootHandler(w http.ResponseWriter, r *http.Request) {
 	rpath := leadingComponent(r.URL.Path)
-	rhost := fmt.Sprintf("%s.%s", rpath, s.HTTPUpgrader.Root())
+	// TODO: do this without relying on rewriting request hostname
+	rhost := fmt.Sprintf("%s.%s", rpath, r.Host)
 	rt, ok := s.GetRoundTripper(rhost)
 	if !ok {
 		DefaultIndex().ServeHTTP(w, r)

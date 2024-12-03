@@ -17,6 +17,7 @@ func NewWTServer(host string, store Storage) *WTServer {
 		Server: &wt.Server{
 			CheckOrigin: func(*http.Request) bool { return true },
 		},
+		RootPatterns: []string{host},
 	}
 	s := &WTServer{
 		Storage:  store,
@@ -61,8 +62,8 @@ func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	DispatcherFunc(s.Dispatch).ServeHTTP(w, r)
 }
 
-func (s *WTServer) IsRoot(r *http.Request) bool {
-	return utils.StripPort(r.Host) == utils.StripPort(s.Upgrader.Root())
+func (s *WTServer) IsRootExternal(r *http.Request) bool {
+	return s.Upgrader.IsRoot(utils.StripPort(r.Host))
 }
 
 func (s *WTServer) IsRootInternal(r *http.Request) bool {
@@ -72,6 +73,6 @@ func (s *WTServer) IsRootInternal(r *http.Request) bool {
 func (s *WTServer) IsUpgrade(r *http.Request) bool {
 	isHeader := r.Header.Get(webtransport.UpgradeHeader) != ""
 	isQuery := r.URL.Query().Get(webtransport.UpgradeQuery) != ""
-	isRoot := s.IsRoot(r)
+	isRoot := s.IsRootExternal(r)
 	return isRoot && (isHeader || isQuery)
 }
