@@ -62,7 +62,6 @@ func ProxyDispatcher(r *http.Request) http.Handler {
 func handleInternal(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	msg := r.Method + " " + r.Host
-	println(msg)
 	http.Error(w, msg, http.StatusOK)
 }
 
@@ -115,9 +114,7 @@ func (s *WSServer) RootInternalHandler(w http.ResponseWriter, r *http.Request) {
 // rewrite requests targeting example.com/sub/* to sub.example.com/*
 func (s *WSServer) RootHandler(w http.ResponseWriter, r *http.Request) {
 	rpath := leadingComponent(r.URL.Path)
-	// TODO: do this without relying on rewriting request hostname
-	rhost := fmt.Sprintf("%s.%s", rpath, r.Host)
-	rt, ok := s.GetRoundTripper(rhost)
+	rt, ok := s.GetRoundTripper(rpath)
 	if !ok {
 		DefaultIndex().ServeHTTP(w, r)
 		return

@@ -37,7 +37,7 @@ type Storage interface {
 	Dispatcher
 
 	// get Session wrapped by http.Transport
-	GetRoundTripper(k string) (http.RoundTripper, bool)
+	GetRoundTripper(h string) (http.RoundTripper, bool)
 
 	// record Info
 	RecordsHandler(w http.ResponseWriter, r *http.Request)
