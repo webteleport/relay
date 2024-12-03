@@ -36,6 +36,7 @@ func NewSessionStore() *SessionStore {
 		Webhook:      os.Getenv("WEBHOOK"),
 		Client:       &http.Client{},
 		Record:       map[string]*Record{},
+		OnionRecord:  map[string]*Record{},
 	}
 	s.Router.Handle("/", DispatcherFunc(s.Dispatch))
 	return s
@@ -49,6 +50,7 @@ type SessionStore struct {
 	Webhook      string
 	Client       *http.Client
 	Record       map[string]*Record
+	OnionRecord  map[string]*Record
 }
 
 func (s *SessionStore) WebLog(msg string) {
@@ -133,18 +135,32 @@ func (s *SessionStore) Visited(k string) {
 
 func (s *SessionStore) RemoveSession(tssn tunnel.Session) {
 	s.Lock.Lock()
-	for k, rec := range s.Record {
+	for _, rec := range s.Record {
 		if rec.Session == tssn {
-			delete(s.Record, k)
+			delete(s.Record, rec.Key)
+			delete(s.OnionRecord, rec.OnionID)
 			if s.Verbose {
-				slog.Info("remove", "key", k)
+				slog.Info("remove", "key", rec.Key)
 			}
-			s.WebLog(fmt.Sprintf("remove/%s", k))
+			s.WebLog(fmt.Sprintf("remove/%s?ip=%s&onion_id=%s", rec.Key, rec.IP, rec.OnionID))
 			break
 		}
 	}
 	s.Lock.Unlock()
 	expvars.WebteleportRelaySessionsClosed.Add(1)
+}
+
+func (s *SessionStore) GetOnionSession(k string) (tunnel.Session, bool) {
+	k = utils.StripPort(k)
+	k, _ = idna.ToASCII(k)
+	k = strings.Split(k, ".")[0]
+	s.Lock.RLock()
+	rec, ok := s.OnionRecord[k]
+	s.Lock.RUnlock()
+	if ok {
+		return rec.Session, true
+	}
+	return nil, false
 }
 
 func (s *SessionStore) GetSession(k string) (tunnel.Session, bool) {
@@ -179,8 +195,9 @@ func (s *SessionStore) Upsert(k string, r *edge.Edge) {
 	}
 
 	s.Lock.Lock()
-	_, has := s.Record[k]
-	s.Record[k] = rec
+	_, has := s.Record[rec.Key]
+	s.Record[rec.Key] = rec
+	s.OnionRecord[rec.OnionID] = rec
 	s.Lock.Unlock()
 
 	action := ""
@@ -190,9 +207,9 @@ func (s *SessionStore) Upsert(k string, r *edge.Edge) {
 		action = "insert"
 	}
 	if s.Verbose {
-		slog.Info(action, "key", k, "ip", rec.IP)
+		slog.Info(action, "key", rec.Key, "ip", rec.IP, "onion_id", rec.OnionID)
 	}
-	s.WebLog(fmt.Sprintf("%s/%s?ip=%s", action, k, rec.IP))
+	s.WebLog(fmt.Sprintf("%s/%s?ip=%s&onion_id=%s", action, rec.Key, rec.IP, rec.OnionID))
 
 	if os.Getenv("PING") != "" {
 		go s.Ping(r)
@@ -309,10 +326,18 @@ func (s *SessionStore) Negotiate(r *edge.Edge, root string) (string, error) {
 	return hKey, nil
 }
 
+func (s *SessionStore) GetOnionRoundTripper(k string) (http.RoundTripper, bool) {
+	tssn, ok := s.GetOnionSession(k)
+	if !ok {
+		return nil, false
+	}
+	return RoundTripper(tssn), true
+}
+
 func (s *SessionStore) GetRoundTripper(k string) (http.RoundTripper, bool) {
 	tssn, ok := s.GetSession(k)
 	if !ok {
-		return nil, false
+		return s.GetOnionRoundTripper(k)
 	}
 	return RoundTripper(tssn), true
 }
