@@ -6,10 +6,10 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/webteleport/webteleport/transport/go-quic"
+	"github.com/webteleport/webteleport/transport/net-quic"
 )
 
-func RunGoQuic(args []string) error {
+func RunNetQuic(args []string) error {
 	ln, err := quic.Listen(context.Background(), arg0(args, "127.0.0.1:8083/test-go-quic?asdf=1"))
 	if err != nil {
 		return err

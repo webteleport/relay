@@ -58,7 +58,7 @@ func main() {
 	log.Println("Starting server on quic-go://127.0.0.1:" + QUIC_GO_PORT)
 	go store.Subscribe(quicGoUpgrader)
 
-	goQuicUpgrader, err := newGoQuicUpgrader(HOST, GO_QUIC_PORT)
+	goQuicUpgrader, err := newNetQuicUpgrader(HOST, GO_QUIC_PORT)
 	if err != nil {
 		log.Fatal(err)
 	}
