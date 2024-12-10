@@ -16,9 +16,9 @@ func arg0(args []string, fallback string) string {
 }
 
 var cmdRun multicall.RunnerFuncMap = map[string]multicall.RunnerFunc{
-	"tcp":     RunTcp,
-	"quic-go": RunQuicGo,
-	"go-quic": RunGoQuic,
+	"tcp":      RunTcp,
+	"quic-go":  RunQuicGo,
+	"net-quic": RunNetQuic,
 }
 
 func main() {

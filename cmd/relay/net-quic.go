@@ -4,14 +4,14 @@ import (
 	"log/slog"
 	"os"
 
-	gq "github.com/webteleport/webteleport/transport/go-quic"
-	"github.com/webtransport/quic"
+	nq "github.com/webteleport/webteleport/transport/net-quic"
+	"golang.org/x/net/quic"
 )
 
 // 2^60 == 1152921504606846976
 var MaxBidiRemoteStreams int64 = 1 << 60
 
-var GoQuicConfig = &quic.Config{
+var NetQuicConfig = &quic.Config{
 	TLSConfig:            TLSConfig,
 	MaxBidiRemoteStreams: MaxBidiRemoteStreams,
 	QLogLogger: slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
@@ -20,13 +20,13 @@ var GoQuicConfig = &quic.Config{
 	})),
 }
 
-func newGoQuicUpgrader(host string, port string) (*gq.Upgrader, error) {
-	qln, err := quic.Listen("udp", "0.0.0.0:"+port, GoQuicConfig)
+func newNetQuicUpgrader(host string, port string) (*nq.Upgrader, error) {
+	qln, err := quic.Listen("udp", "0.0.0.0:"+port, NetQuicConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	upgrader := &gq.Upgrader{
+	upgrader := &nq.Upgrader{
 		Listener:     qln,
 		RootPatterns: []string{host},
 	}
