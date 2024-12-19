@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/webteleport/webteleport/transport/net-quic"
+	quic "github.com/webteleport/webteleport/transport/net-quic"
 )
 
 func RunNetQuic(args []string) error {

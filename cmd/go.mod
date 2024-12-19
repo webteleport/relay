@@ -1,6 +1,6 @@
 module github.com/webteleport/relay/cmd
 
-go 1.23.3
+go 1.23.4
 
 replace github.com/webteleport/relay => ..
 
@@ -8,16 +8,18 @@ require (
 	github.com/btwiuse/multicall v0.0.5
 	github.com/quic-go/quic-go v0.48.2
 	github.com/webteleport/relay v0.4.43
-	github.com/webteleport/webteleport v0.5.37
+	github.com/webteleport/webteleport v0.5.38
 	golang.org/x/net v0.32.0
 )
 
 require (
 	github.com/alexpantyukhin/go-pattern-match v0.0.0-20230301210247-d84479c117d7 // indirect
 	github.com/btwiuse/connect v0.0.5 // indirect
+	github.com/btwiuse/dispatcher v0.0.0 // indirect
 	github.com/btwiuse/forward v0.0.0 // indirect
 	github.com/btwiuse/muxr v0.0.1 // indirect
 	github.com/btwiuse/tags v0.0.2 // indirect
+	github.com/btwiuse/version v0.0.1 // indirect
 	github.com/btwiuse/wsconn v0.0.3 // indirect
 	github.com/ebi-yade/altsvc-go v0.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
@@ -28,7 +30,7 @@ require (
 	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/miekg/dns v1.1.62 // indirect
-	github.com/onsi/ginkgo/v2 v2.12.0 // indirect
+	github.com/onsi/ginkgo/v2 v2.13.0 // indirect
 	github.com/quic-go/qpack v0.5.1 // indirect
 	github.com/quic-go/webtransport-go v0.8.1-0.20241018022711-4ac2c9250e66 // indirect
 	github.com/rs/cors v1.11.1 // indirect
@@ -41,5 +43,6 @@ require (
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
+	k8s.io/apimachinery v0.29.2 // indirect
 	nhooyr.io/websocket v1.8.17 // indirect
 )

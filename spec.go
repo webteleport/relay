@@ -3,26 +3,15 @@ package relay
 import (
 	"net/http"
 
+	"github.com/btwiuse/dispatcher"
 	"github.com/btwiuse/muxr"
 	"github.com/webteleport/webteleport/edge"
 )
 
-// dispatch to other http.Handler implementations
-type Dispatcher interface {
-	Dispatch(r *http.Request) http.Handler
-}
-
-// wrapping Dispatcher into http.Handler
-type DispatcherFunc func(*http.Request) http.Handler
-
-func (d DispatcherFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	d(r).ServeHTTP(w, r)
-}
-
 // edge.Edge multiplexer with builtin HTTPUpgrader
 type Relayer interface {
 	// dispatch to HTTPUpgrader and Storage
-	Dispatcher
+	dispatcher.Dispatcher
 
 	// builtin HTTPUpgrader
 	edge.HTTPUpgrader
@@ -34,7 +23,7 @@ type Relayer interface {
 // edge.Edge multiplexer
 type Storage interface {
 	// Dispatch to edge.Edge
-	Dispatcher
+	dispatcher.Dispatcher
 
 	// get Session wrapped by http.Transport
 	GetRoundTripper(h string) (http.RoundTripper, bool)

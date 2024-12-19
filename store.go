@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btwiuse/dispatcher"
 	"github.com/btwiuse/muxr"
 	"github.com/btwiuse/tags"
 	"github.com/webteleport/utils"
@@ -36,7 +37,7 @@ func NewSessionStore() *SessionStore {
 		Client:       &http.Client{},
 		Record:       map[string]*Record{},
 	}
-	s.Router.Handle("/", DispatcherFunc(s.Dispatch))
+	s.Router.Handle("/", dispatcher.DispatcherFunc(s.Dispatch))
 	return s
 }
 
@@ -257,7 +258,7 @@ func (s *SessionStore) Dispatch(r *http.Request) http.Handler {
 	if !ok {
 		return utils.HostNotFoundHandler()
 	}
-	rp := ReverseProxy(rt)
+	rp := utils.LoggedReverseProxy(rt)
 	rp.Rewrite = func(req *httputil.ProxyRequest) {
 		req.SetXForwarded()
 

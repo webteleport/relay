@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/btwiuse/connect"
+	"github.com/btwiuse/dispatcher"
 	"github.com/btwiuse/forward"
 	"github.com/webteleport/utils"
 )
@@ -70,7 +71,7 @@ func IsInternal(r *http.Request) bool {
 }
 
 func NewProxyHandler() http.Handler {
-	return DispatcherFunc(ProxyDispatcher)
+	return dispatcher.DispatcherFunc(ProxyDispatcher)
 }
 
 // ConnectVerbose is a misnomer
@@ -120,7 +121,7 @@ func (s *WSServer) RootHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rp := ReverseProxy(rt)
+	rp := utils.LoggedReverseProxy(rt)
 	rp.Rewrite = func(req *httputil.ProxyRequest) {
 		req.SetXForwarded()
 

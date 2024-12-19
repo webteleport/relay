@@ -3,6 +3,7 @@ package relay
 import (
 	"net/http"
 
+	"github.com/btwiuse/dispatcher"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/edge"
 	"github.com/webteleport/webteleport/transport/websocket"
@@ -45,7 +46,7 @@ func (s *WSServer) Dispatch(r *http.Request) http.Handler {
 }
 
 func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	DispatcherFunc(s.Dispatch).ServeHTTP(w, r)
+	dispatcher.DispatcherFunc(s.Dispatch).ServeHTTP(w, r)
 }
 
 func (s *WSServer) IsRootExternal(r *http.Request) bool {

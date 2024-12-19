@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/webteleport/webteleport/transport/quic-go"
+	quic "github.com/webteleport/webteleport/transport/quic-go"
 )
 
 func RunQuicGo(args []string) error {

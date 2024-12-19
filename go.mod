@@ -1,18 +1,19 @@
 module github.com/webteleport/relay
 
-go 1.23.3
+go 1.23.4
 
 // replace github.com/webteleport/webteleport => ../webteleport
 // replace github.com/webteleport/utils => ../utils
 
 require (
 	github.com/btwiuse/connect v0.0.5
+	github.com/btwiuse/dispatcher v0.0.0
 	github.com/btwiuse/forward v0.0.0
 	github.com/btwiuse/muxr v0.0.1
 	github.com/btwiuse/tags v0.0.2
 	github.com/quic-go/quic-go v0.48.2
 	github.com/quic-go/webtransport-go v0.8.1-0.20241018022711-4ac2c9250e66
-	github.com/webteleport/utils v0.2.16
+	github.com/webteleport/utils v0.2.17
 	github.com/webteleport/webteleport v0.5.38
 	golang.org/x/crypto v0.30.0
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
