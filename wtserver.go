@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"net/http"
 
+	"github.com/btwiuse/dispatcher"
 	"github.com/quic-go/quic-go/http3"
 	wt "github.com/quic-go/webtransport-go"
 	"github.com/webteleport/utils"
@@ -59,7 +60,7 @@ func (s *WTServer) Dispatch(r *http.Request) http.Handler {
 }
 
 func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	DispatcherFunc(s.Dispatch).ServeHTTP(w, r)
+	dispatcher.DispatcherFunc(s.Dispatch).ServeHTTP(w, r)
 }
 
 func (s *WTServer) IsRootExternal(r *http.Request) bool {

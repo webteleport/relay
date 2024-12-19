@@ -120,7 +120,7 @@ func (s *WSServer) RootHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rp := ReverseProxy(rt)
+	rp := utils.LoggedReverseProxy(rt)
 	rp.Rewrite = func(req *httputil.ProxyRequest) {
 		req.SetXForwarded()
 
