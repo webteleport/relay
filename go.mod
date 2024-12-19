@@ -13,13 +13,14 @@ require (
 	github.com/quic-go/quic-go v0.48.2
 	github.com/quic-go/webtransport-go v0.8.1-0.20241018022711-4ac2c9250e66
 	github.com/webteleport/utils v0.2.16
-	github.com/webteleport/webteleport v0.5.37
+	github.com/webteleport/webteleport v0.5.38
 	golang.org/x/crypto v0.30.0
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
 	golang.org/x/net v0.32.0
 )
 
 require (
+	github.com/btwiuse/version v0.0.1 // indirect
 	github.com/btwiuse/wsconn v0.0.3 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
@@ -29,7 +30,7 @@ require (
 	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/miekg/dns v1.1.62 // indirect
-	github.com/onsi/ginkgo/v2 v2.12.0 // indirect
+	github.com/onsi/ginkgo/v2 v2.13.0 // indirect
 	github.com/quic-go/qpack v0.5.1 // indirect
 	github.com/rs/cors v1.11.1 // indirect
 	go.uber.org/mock v0.4.0 // indirect
@@ -38,5 +39,6 @@ require (
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
+	k8s.io/apimachinery v0.29.2 // indirect
 	nhooyr.io/websocket v1.8.17 // indirect
 )
