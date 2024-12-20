@@ -13,6 +13,10 @@ import (
 
 var _ Relayer = (*WTServer)(nil)
 
+func DefaultWTServer(host string) *WTServer {
+	return NewWTServer(host, DefaultIngress)
+}
+
 func NewWTServer(host string, ingress Ingress) *WTServer {
 	hu := &webtransport.Upgrader{
 		Server: &wt.Server{

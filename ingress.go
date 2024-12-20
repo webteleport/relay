@@ -15,6 +15,8 @@ import (
 
 var _ Ingress = (*IngressHandler)(nil)
 
+var DefaultIngress = NewIngressHandler(DefaultStorage)
+
 type IngressHandler struct {
 	*muxr.Router
 	storage Storage

@@ -11,6 +11,10 @@ import (
 
 var _ Relayer = (*WSServer)(nil)
 
+func DefaultWSServer(host string) *WSServer {
+	return NewWSServer(host, DefaultIngress)
+}
+
 func NewWSServer(host string, ingress Ingress) *WSServer {
 	hu := &websocket.Upgrader{
 		RootPatterns: []string{host},

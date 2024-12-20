@@ -23,6 +23,8 @@ import (
 
 var _ Storage = (*Store)(nil)
 
+var DefaultStorage = NewStore()
+
 type Store struct {
 	Lock         *sync.RWMutex
 	PingInterval time.Duration
