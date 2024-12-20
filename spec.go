@@ -23,8 +23,6 @@ type Relayer interface {
 
 // storage exposed as HTTP server
 type Ingress interface {
-	Storage
-
 	// shortcut to dispatcher
 	http.Handler
 
@@ -36,6 +34,9 @@ type Ingress interface {
 
 	// record Info
 	RecordsHandler(w http.ResponseWriter, r *http.Request)
+
+	// subscribe to incoming stream of edge.Edge
+	edge.Subscriber
 }
 
 // edge.Edge multiplexer

@@ -6,17 +6,13 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/btwiuse/dispatcher"
-	"github.com/btwiuse/muxr"
 	"github.com/btwiuse/tags"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/edge"
@@ -25,24 +21,9 @@ import (
 	"golang.org/x/net/idna"
 )
 
-var _ Storage = (*SessionStore)(nil)
+var _ Storage = (*Store)(nil)
 
-func NewSessionStore() *SessionStore {
-	s := &SessionStore{
-		Router:       muxr.NewRouter(),
-		Lock:         &sync.RWMutex{},
-		PingInterval: time.Second * 5,
-		Verbose:      os.Getenv("VERBOSE") != "",
-		Webhook:      os.Getenv("WEBHOOK"),
-		Client:       &http.Client{},
-		Record:       map[string]*Record{},
-	}
-	s.Router.Handle("/", dispatcher.DispatcherFunc(s.Dispatch))
-	return s
-}
-
-type SessionStore struct {
-	*muxr.Router
+type Store struct {
 	Lock         *sync.RWMutex
 	PingInterval time.Duration
 	Verbose      bool
@@ -51,7 +32,28 @@ type SessionStore struct {
 	Record       map[string]*Record
 }
 
-func (s *SessionStore) WebLog(msg string) {
+func NewStore() *Store {
+	return &Store{
+		Lock:         &sync.RWMutex{},
+		PingInterval: time.Second * 5,
+		Verbose:      os.Getenv("VERBOSE") != "",
+		Webhook:      os.Getenv("WEBHOOK"),
+		Client:       &http.Client{},
+		Record:       map[string]*Record{},
+	}
+}
+
+func (s *Store) Records() (all []*Record) {
+	s.Lock.RLock()
+	all = maps.Values(s.Record)
+	s.Lock.RUnlock()
+	sort.Slice(all, func(i, j int) bool {
+		return all[i].Since.After(all[j].Since)
+	})
+	return
+}
+
+func (s *Store) WebLog(msg string) {
 	if s.Webhook == "" {
 		return
 	}
@@ -63,63 +65,7 @@ func (s *SessionStore) WebLog(msg string) {
 	go s.Client.Do(req)
 }
 
-type Record struct {
-	Key     string         `json:"key"`
-	Session tunnel.Session `json:"-"`
-	Header  tags.Tags      `json:"header"`
-	Tags    tags.Tags      `json:"tags"`
-	Since   time.Time      `json:"since"`
-	Visited int            `json:"visited"`
-	IP      string         `json:"ip"`
-	Path    string         `json:"path"`
-}
-
-func (r *Record) Matches(kvs url.Values) (ok bool) {
-	for k, v := range kvs {
-		// r.Tags contains k
-		tv, has := r.Tags.Values[k]
-		if !has {
-			return false
-		}
-		// tv is superset of v
-		for _, vv := range v {
-			if !slices.Contains(tv, vv) {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func (s *SessionStore) Records() (all []*Record) {
-	s.Lock.RLock()
-	all = maps.Values(s.Record)
-	s.Lock.RUnlock()
-	lessFunc := func(i, j int) bool {
-		return all[i].Since.After(all[j].Since)
-	}
-	sort.Slice(all, lessFunc)
-	return
-}
-
-func (s *SessionStore) RecordsHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	all := s.Records()
-	filtered := []*Record{}
-	for _, rec := range all {
-		if rec.Matches(r.URL.Query()) {
-			filtered = append(filtered, rec)
-		}
-	}
-	resp, err := tags.UnescapedJSONMarshalIndent(filtered, "  ")
-	if err != nil {
-		slog.Warn(fmt.Sprintf("json marshal failed: %s", err))
-		return
-	}
-	w.Write(resp)
-}
-
-func (s *SessionStore) Visited(k string) {
+func (s *Store) Visited(k string) {
 	k = utils.StripPort(k)
 	k, _ = idna.ToASCII(k)
 	k = strings.Split(k, ".")[0]
@@ -131,7 +77,7 @@ func (s *SessionStore) Visited(k string) {
 	s.Lock.Unlock()
 }
 
-func (s *SessionStore) RemoveSession(tssn tunnel.Session) {
+func (s *Store) RemoveSession(tssn tunnel.Session) {
 	s.Lock.Lock()
 	for _, rec := range s.Record {
 		if rec.Session == tssn {
@@ -147,7 +93,7 @@ func (s *SessionStore) RemoveSession(tssn tunnel.Session) {
 	expvars.WebteleportRelaySessionsClosed.Add(1)
 }
 
-func (s *SessionStore) GetSession(h string) (tunnel.Session, bool) {
+func (s *Store) GetSession(h string) (tunnel.Session, bool) {
 	k := utils.StripPort(h)
 	k, _ = idna.ToASCII(k)
 	k = strings.Split(k, ".")[0]
@@ -160,7 +106,16 @@ func (s *SessionStore) GetSession(h string) (tunnel.Session, bool) {
 	return nil, false
 }
 
-func (s *SessionStore) Upsert(k string, r *edge.Edge) {
+func (s *Store) Allocate(r *edge.Edge) (string, error) {
+	k := deriveOnionID(r.Path)
+	_, err := io.WriteString(r.Stream, fmt.Sprintf("HOST %s\n", k))
+	if err != nil {
+		return "", err
+	}
+	return k, nil
+}
+
+func (s *Store) Upsert(k string, r *edge.Edge) {
 	since := time.Now()
 	header := tags.Tags{Values: url.Values(r.Header)}
 	tags := tags.Tags{Values: r.Values}
@@ -199,12 +154,7 @@ func (s *SessionStore) Upsert(k string, r *edge.Edge) {
 	expvars.WebteleportRelaySessionsAccepted.Add(1)
 }
 
-// Ping proactively pings the client to keep the connection alive and to detect if the client has disconnected.
-// If the client has disconnected, the session is removed from the session store.
-//
-// This function has been found mostly unnecessary since the disconnect is automatically detected by the
-// underlying transport layer and handled by the Scan function. However, it is kept here for completeness.
-func (s *SessionStore) Ping(r *edge.Edge) {
+func (s *Store) Ping(r *edge.Edge) {
 	for {
 		time.Sleep(s.PingInterval)
 		_, err := io.WriteString(r.Stream, "\n")
@@ -215,17 +165,14 @@ func (s *SessionStore) Ping(r *edge.Edge) {
 	s.RemoveSession(r.Session)
 }
 
-func (s *SessionStore) Scan(r *edge.Edge) {
+func (s *Store) Scan(r *edge.Edge) {
 	scanner := bufio.NewScanner(r.Stream)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" || line == "PONG" {
-			// currently client reply nothing to server PING's
-			// so this is a noop
 			continue
 		}
 		if line == "CLOSE" {
-			// close session immediately
 			break
 		}
 		slog.Warn(fmt.Sprintf("stm0: unknown command: %s", line))
@@ -233,52 +180,7 @@ func (s *SessionStore) Scan(r *edge.Edge) {
 	s.RemoveSession(r.Session)
 }
 
-func (s *SessionStore) Allocate(r *edge.Edge) (string, error) {
-	k := deriveOnionID(r.Path)
-
-	// Notify the client of the allocated hostname
-	_, err := io.WriteString(r.Stream, fmt.Sprintf("HOST %s\n", k))
-	if err != nil {
-		return "", err
-	}
-
-	return k, nil
-}
-
-func (s *SessionStore) GetRoundTripper(h string) (http.RoundTripper, bool) {
-	tssn, ok := s.GetSession(h)
-	if !ok {
-		return nil, false
-	}
-	return RoundTripper(tssn), true
-}
-
-func (s *SessionStore) Dispatch(r *http.Request) http.Handler {
-	rt, ok := s.GetRoundTripper(r.Host)
-	if !ok {
-		return utils.HostNotFoundHandler()
-	}
-	rp := utils.LoggedReverseProxy(rt)
-	rp.Rewrite = func(req *httputil.ProxyRequest) {
-		req.SetXForwarded()
-
-		req.Out.URL.Host = r.Host
-		// for webtransport, Proto is "webtransport" instead of "HTTP/1.1"
-		// However, reverseproxy doesn't support webtransport yet
-		// so setting this field currently doesn't have any effect
-		req.Out.URL.Scheme = "http"
-	}
-	rp.ModifyResponse = func(resp *http.Response) error {
-		s.Visited(r.Host)
-		// TODO
-		// is it ok to assume that the session is closed when the response is received?
-		expvars.WebteleportRelayStreamsClosed.Add(1)
-		return nil
-	}
-	return rp
-}
-
-func (s *SessionStore) Subscribe(upgrader edge.Upgrader) {
+func (s *Store) Subscribe(upgrader edge.Upgrader) {
 	for {
 		r, err := upgrader.Upgrade()
 		if err == io.EOF {
