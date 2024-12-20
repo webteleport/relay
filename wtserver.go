@@ -13,7 +13,7 @@ import (
 
 var _ Relayer = (*WTServer)(nil)
 
-func NewWTServer(host string, store Storage) *WTServer {
+func NewWTServer(host string, ingress Ingress) *WTServer {
 	hu := &webtransport.Upgrader{
 		Server: &wt.Server{
 			CheckOrigin: func(*http.Request) bool { return true },
@@ -21,7 +21,7 @@ func NewWTServer(host string, store Storage) *WTServer {
 		RootPatterns: []string{host},
 	}
 	s := &WTServer{
-		Storage:  store,
+		Ingress:  ingress,
 		Upgrader: hu,
 	}
 	hu.Server.H3 = http3.Server{
@@ -29,7 +29,7 @@ func NewWTServer(host string, store Storage) *WTServer {
 		// WebTransport requires DATAGRAM support
 		EnableDatagrams: true,
 	}
-	go store.Subscribe(hu)
+	go ingress.Subscribe(hu)
 	return s
 }
 
@@ -44,7 +44,7 @@ func (s *WTServer) WithTLSConfig(tlsConfig *tls.Config) *WTServer {
 }
 
 type WTServer struct {
-	Storage
+	Ingress
 	*webtransport.Upgrader
 }
 
@@ -55,7 +55,7 @@ func (s *WTServer) Dispatch(r *http.Request) http.Handler {
 	case IsProxy(r):
 		return AuthenticatedProxyHandler
 	default:
-		return s.Storage
+		return s.Ingress
 	}
 }
 

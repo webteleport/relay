@@ -34,7 +34,7 @@ require (
 	github.com/quic-go/qpack v0.5.1 // indirect
 	github.com/quic-go/webtransport-go v0.8.1-0.20241018022711-4ac2c9250e66 // indirect
 	github.com/rs/cors v1.11.1 // indirect
-	github.com/webteleport/utils v0.2.16 // indirect
+	github.com/webteleport/utils v0.2.17 // indirect
 	go.uber.org/mock v0.4.0 // indirect
 	golang.org/x/crypto v0.30.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect

@@ -6,6 +6,7 @@ import (
 	"github.com/btwiuse/dispatcher"
 	"github.com/btwiuse/muxr"
 	"github.com/webteleport/webteleport/edge"
+	"github.com/webteleport/webteleport/tunnel"
 )
 
 // edge.Edge multiplexer with builtin HTTPUpgrader
@@ -16,27 +17,56 @@ type Relayer interface {
 	// builtin HTTPUpgrader
 	edge.HTTPUpgrader
 
-	// edge.Edge multiplexer
-	Storage
+	// edge.Edge consumer
+	Ingress
 }
 
-// edge.Edge multiplexer
-type Storage interface {
-	// Dispatch to edge.Edge
-	dispatcher.Dispatcher
+// storage exposed as HTTP server
+type Ingress interface {
+	Storage
+
+	// shortcut to dispatcher
+	http.Handler
+
+	// apply middleware to dispatcher
+	Use(middlewares ...muxr.Middleware)
 
 	// get Session wrapped by http.Transport
 	GetRoundTripper(h string) (http.RoundTripper, bool)
 
 	// record Info
 	RecordsHandler(w http.ResponseWriter, r *http.Request)
+}
+
+// edge.Edge multiplexer
+type Storage interface {
+	// allocate new session
+	Allocate(r *edge.Edge) (string, error)
+
+	// remove session
+	RemoveSession(tssn tunnel.Session)
+
+	// upsert session
+	Upsert(k string, r *edge.Edge)
+
+	// get session
+	GetSession(h string) (tunnel.Session, bool)
+
+	// get all records
+	Records() (all []*Record)
+
+	// scan edge.Edge
+	Scan(r *edge.Edge)
+
+	// ping edge.Edge
+	Ping(r *edge.Edge)
 
 	// subscribe to incoming stream of edge.Edge
 	edge.Subscriber
 
-	// apply middleware to dispatcher
-	Use(middlewares ...muxr.Middleware)
+	// log message
+	WebLog(msg string)
 
-	// shortcut to dispatcher
-	http.Handler
+	// mark visited
+	Visited(k string)
 }

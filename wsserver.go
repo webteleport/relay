@@ -11,20 +11,20 @@ import (
 
 var _ Relayer = (*WSServer)(nil)
 
-func NewWSServer(host string, store Storage) *WSServer {
+func NewWSServer(host string, ingress Ingress) *WSServer {
 	hu := &websocket.Upgrader{
 		RootPatterns: []string{host},
 	}
 	s := &WSServer{
-		Storage:      store,
+		Ingress:      ingress,
 		HTTPUpgrader: hu,
 	}
-	go store.Subscribe(hu)
+	go ingress.Subscribe(hu)
 	return s
 }
 
 type WSServer struct {
-	Storage
+	Ingress
 	edge.HTTPUpgrader
 }
 
@@ -41,7 +41,7 @@ func (s *WSServer) Dispatch(r *http.Request) http.Handler {
 	case IsProxy(r):
 		return AuthenticatedProxyHandler
 	default:
-		return s.Storage
+		return s.Ingress
 	}
 }
 
