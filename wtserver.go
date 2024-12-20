@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/btwiuse/dispatcher"
+	"github.com/btwiuse/proxy"
 	"github.com/quic-go/quic-go/http3"
 	wt "github.com/quic-go/webtransport-go"
 	"github.com/webteleport/utils"
@@ -56,8 +57,8 @@ func (s *WTServer) Dispatch(r *http.Request) http.Handler {
 	switch {
 	case s.IsUpgrade(r):
 		return s.Upgrader
-	case IsProxy(r):
-		return AuthenticatedProxyHandler
+	case proxy.IsProxy(r):
+		return proxy.AuthenticatedProxyHandler
 	default:
 		return s.Ingress
 	}

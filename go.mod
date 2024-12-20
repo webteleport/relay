@@ -6,10 +6,9 @@ go 1.23.4
 // replace github.com/webteleport/utils => ../utils
 
 require (
-	github.com/btwiuse/connect v0.0.5
 	github.com/btwiuse/dispatcher v0.0.0
-	github.com/btwiuse/forward v0.0.0
 	github.com/btwiuse/muxr v0.0.1
+	github.com/btwiuse/proxy v0.0.0
 	github.com/btwiuse/tags v0.0.2
 	github.com/quic-go/quic-go v0.48.2
 	github.com/quic-go/webtransport-go v0.8.1-0.20241018022711-4ac2c9250e66
@@ -21,6 +20,8 @@ require (
 )
 
 require (
+	github.com/btwiuse/connect v0.0.5 // indirect
+	github.com/btwiuse/forward v0.0.0 // indirect
 	github.com/btwiuse/version v0.0.1 // indirect
 	github.com/btwiuse/wsconn v0.0.3 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
