@@ -31,7 +31,7 @@ type Store struct {
 	Verbose      bool
 	Webhook      string
 	Client       *http.Client
-	Record       map[string]*Record
+	RecordMap    map[string]*Record
 }
 
 func NewStore() *Store {
@@ -41,13 +41,13 @@ func NewStore() *Store {
 		Verbose:      os.Getenv("VERBOSE") != "",
 		Webhook:      os.Getenv("WEBHOOK"),
 		Client:       &http.Client{},
-		Record:       map[string]*Record{},
+		RecordMap:    map[string]*Record{},
 	}
 }
 
 func (s *Store) Records() (all []*Record) {
 	s.Lock.RLock()
-	all = maps.Values(s.Record)
+	all = maps.Values(s.RecordMap)
 	s.Lock.RUnlock()
 	sort.Slice(all, func(i, j int) bool {
 		return all[i].Since.After(all[j].Since)
@@ -72,7 +72,7 @@ func (s *Store) Visited(k string) {
 	k, _ = idna.ToASCII(k)
 	k = strings.Split(k, ".")[0]
 	s.Lock.Lock()
-	rec, ok := s.Record[k]
+	rec, ok := s.RecordMap[k]
 	if ok {
 		rec.Visited += 1
 	}
@@ -81,9 +81,9 @@ func (s *Store) Visited(k string) {
 
 func (s *Store) RemoveSession(tssn tunnel.Session) {
 	s.Lock.Lock()
-	for _, rec := range s.Record {
+	for _, rec := range s.RecordMap {
 		if rec.Session == tssn {
-			delete(s.Record, rec.Key)
+			delete(s.RecordMap, rec.Key)
 			if s.Verbose {
 				slog.Info("remove", "key", rec.Key)
 			}
@@ -100,7 +100,7 @@ func (s *Store) GetSession(h string) (tunnel.Session, bool) {
 	k, _ = idna.ToASCII(k)
 	k = strings.Split(k, ".")[0]
 	s.Lock.RLock()
-	rec, ok := s.Record[k]
+	rec, ok := s.RecordMap[k]
 	s.Lock.RUnlock()
 	if ok {
 		return rec.Session, true
@@ -133,8 +133,8 @@ func (s *Store) Upsert(k string, r *edge.Edge) {
 	}
 
 	s.Lock.Lock()
-	_, has := s.Record[k]
-	s.Record[k] = rec
+	_, has := s.RecordMap[k]
+	s.RecordMap[k] = rec
 	s.Lock.Unlock()
 
 	action := ""
