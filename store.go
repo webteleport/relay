@@ -32,6 +32,7 @@ type Store struct {
 	Webhook      string
 	Client       *http.Client
 	RecordMap    map[string]*Record
+	AliasMap     map[string]string
 }
 
 func NewStore() *Store {
@@ -42,6 +43,7 @@ func NewStore() *Store {
 		Webhook:      os.Getenv("WEBHOOK"),
 		Client:       &http.Client{},
 		RecordMap:    map[string]*Record{},
+		AliasMap:     map[string]string{},
 	}
 }
 
@@ -52,6 +54,39 @@ func (s *Store) Records() (all []*Record) {
 	sort.Slice(all, func(i, j int) bool {
 		return all[i].Since.After(all[j].Since)
 	})
+	return
+}
+
+func (s *Store) Alias(k string, v string) {
+	s.Lock.Lock()
+	s.AliasMap[k] = v
+	s.Lock.Unlock()
+}
+
+func (s *Store) Unalias(k string) {
+	s.Lock.Lock()
+	delete(s.AliasMap, k)
+	s.Lock.Unlock()
+}
+
+func (s *Store) Aliases() (all map[string]string) {
+	s.Lock.RLock()
+	all = s.AliasMap
+	s.Lock.RUnlock()
+	return
+}
+
+// lookup record by key, or alias
+func (s *Store) LookupRecord(k string) (rec *Record, ok bool) {
+	s.Lock.RLock()
+	rec, ok = s.RecordMap[k]
+	if !ok {
+		k, ok = s.AliasMap[k]
+		if ok {
+			rec, ok = s.RecordMap[k]
+		}
+	}
+	s.Lock.RUnlock()
 	return
 }
 
@@ -71,12 +106,12 @@ func (s *Store) Visited(k string) {
 	k = utils.StripPort(k)
 	k, _ = idna.ToASCII(k)
 	k = strings.Split(k, ".")[0]
-	s.Lock.Lock()
-	rec, ok := s.RecordMap[k]
+	rec, ok := s.LookupRecord(k)
 	if ok {
+		// potential race condition could happen here
+		// but it's ok as we do not care about the exact number
 		rec.Visited += 1
 	}
-	s.Lock.Unlock()
 }
 
 func (s *Store) RemoveSession(tssn tunnel.Session) {
@@ -99,9 +134,7 @@ func (s *Store) GetSession(h string) (tunnel.Session, bool) {
 	k := utils.StripPort(h)
 	k, _ = idna.ToASCII(k)
 	k = strings.Split(k, ".")[0]
-	s.Lock.RLock()
-	rec, ok := s.RecordMap[k]
-	s.Lock.RUnlock()
+	rec, ok := s.LookupRecord(k)
 	if ok {
 		return rec.Session, true
 	}

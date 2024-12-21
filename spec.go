@@ -70,4 +70,16 @@ type Storage interface {
 
 	// mark visited
 	Visited(k string)
+
+	// alias
+	Alias(k string, v string)
+
+	// unalias
+	Unalias(k string)
+
+	// get all aliases
+	Aliases() (all map[string]string)
+
+	// lookup record
+	LookupRecord(k string) (rec *Record, ok bool)
 }

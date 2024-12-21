@@ -1,3 +1,5 @@
+//go:build exclude
+
 // Deprecated: this file is largely replaced by the new store.go and ingress.go
 // but it is kept here for reference, please do not modify this file
 //
