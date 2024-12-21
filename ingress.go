@@ -2,9 +2,11 @@ package relay
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httputil"
+	"strings"
 
 	"github.com/btwiuse/dispatcher"
 	"github.com/btwiuse/muxr"
@@ -63,6 +65,54 @@ func (i *IngressHandler) RecordsHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.Write(resp)
+}
+
+func (i *IngressHandler) AliasHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		i.getAliases(w, r)
+	case http.MethodPost, http.MethodPut:
+		i.setAlias(w, r)
+	case http.MethodDelete:
+		i.deleteAlias(w, r)
+	}
+}
+
+func (i *IngressHandler) getAliases(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	all := i.storage.Aliases()
+	resp, err := tags.UnescapedJSONMarshalIndent(all, "  ")
+	if err != nil {
+		slog.Warn(fmt.Sprintf("json marshal failed: %s", err))
+		return
+	}
+	w.Write(resp)
+}
+
+// example curl request:
+// curl -X POST -d "<alias> <target>" http://localhost:8080/alias
+func (i *IngressHandler) setAlias(w http.ResponseWriter, r *http.Request) {
+	// get request body as string and split it into alias and target
+	b, err := io.ReadAll(r.Body)
+	if err == nil {
+		line := strings.TrimSpace(string(b))
+		parts := strings.Split(line, " ")
+		if len(parts) == 2 {
+			alias, target := parts[0], parts[1]
+			i.storage.Alias(alias, target)
+		}
+	}
+}
+
+// example curl request:
+// curl -X DELETE -d "<alias>" http://localhost:8080/alias
+func (i *IngressHandler) deleteAlias(w http.ResponseWriter, r *http.Request) {
+	// get request body as string and split it into alias
+	b, err := io.ReadAll(r.Body)
+	if err == nil {
+		alias := strings.TrimSpace(string(b))
+		i.storage.Unalias(alias)
+	}
 }
 
 func (i *IngressHandler) Dispatch(r *http.Request) http.Handler {

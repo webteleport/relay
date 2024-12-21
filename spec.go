@@ -32,6 +32,9 @@ type Ingress interface {
 	// get Session wrapped by http.Transport
 	GetRoundTripper(h string) (http.RoundTripper, bool)
 
+	// alias Info
+	AliasHandler(w http.ResponseWriter, r *http.Request)
+
 	// record Info
 	RecordsHandler(w http.ResponseWriter, r *http.Request)
 

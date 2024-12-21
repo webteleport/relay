@@ -46,6 +46,11 @@ func (s *WSServer) RootInternalHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if aliases := os.Getenv("INTERNAL_ALIASES_PATH"); aliases != "" && r.URL.Path == aliases {
+		s.AliasHandler(w, r)
+		return
+	}
+
 	http.NotFound(w, r)
 }
 
