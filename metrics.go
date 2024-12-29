@@ -16,15 +16,15 @@ type TransportStats struct {
 	FailedRequests       int64         `json:"failedRequests"`
 	ActiveRequests       int64         `json:"activeRequests"`
 	TotalRequestDuration time.Duration `json:"totalRequestDuration"`
-	LastRequestTime      time.Time     `json:"lastRequestTime"`
-	MaxRequestDuration   time.Duration `json:"maxRequestDuration"`
-	MinRequestDuration   time.Duration `json:"minRequestDuration"`
+	LastRequestTime      time.Time     `json:"lastRequestTime,omitempty"`
+	MaxRequestDuration   time.Duration `json:"maxRequestDuration,omitempty"`
+	MinRequestDuration   time.Duration `json:"minRequestDuration,omitempty"`
 }
 
 // MetricsTransport wraps http.Transport to collect various HTTP metrics
 type MetricsTransport struct {
 	Transport http.RoundTripper
-	Stats     TransportStats
+	Stats     *TransportStats
 }
 
 // metricReader wraps an io.Reader to count bytes read
@@ -94,9 +94,7 @@ func NewMetricsTransport(wrapped http.RoundTripper) *MetricsTransport {
 	}
 	return &MetricsTransport{
 		Transport: wrapped,
-		Stats: TransportStats{
-			MinRequestDuration: 1<<63 - 1, // Initialize to max duration
-		},
+		Stats:     &TransportStats{},
 	}
 }
 
@@ -122,10 +120,10 @@ func (t *MetricsTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	t.Stats.LastRequestTime = time.Now()
 
 	// Update min/max request times
-	if duration > t.Stats.MaxRequestDuration {
+	if t.Stats.MaxRequestDuration == 0 || duration > t.Stats.MaxRequestDuration {
 		t.Stats.MaxRequestDuration = duration
 	}
-	if duration < t.Stats.MinRequestDuration {
+	if t.Stats.MinRequestDuration == 0 || duration < t.Stats.MinRequestDuration {
 		t.Stats.MinRequestDuration = duration
 	}
 
@@ -142,17 +140,12 @@ func (t *MetricsTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	return resp, nil
 }
 
-// GetStats returns a copy of the current transport statistics
-func (t *MetricsTransport) GetStats() TransportStats {
-	return t.Stats
-}
-
 // MarshalJSON implements the json.Marshaler interface
 func (t *MetricsTransport) MarshalJSON() ([]byte, error) {
-	return json.Marshal(t.GetStats())
+	return json.Marshal(t.Stats)
 }
 
 // MarshalJSONIndent returns an indented JSON representation
 func (t *MetricsTransport) MarshalJSONIndent(prefix, indent string) ([]byte, error) {
-	return json.MarshalIndent(t.GetStats(), prefix, indent)
+	return json.MarshalIndent(t.Stats, prefix, indent)
 }
