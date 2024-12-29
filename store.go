@@ -102,18 +102,6 @@ func (s *Store) WebLog(msg string) {
 	go s.Client.Do(req)
 }
 
-func (s *Store) Visited(k string) {
-	k = utils.StripPort(k)
-	k, _ = idna.ToASCII(k)
-	k = strings.Split(k, ".")[0]
-	rec, ok := s.LookupRecord(k)
-	if ok {
-		// potential race condition could happen here
-		// but it's ok as we do not care about the exact number
-		rec.Visited += 1
-	}
-}
-
 func (s *Store) RemoveSession(tssn tunnel.Session) {
 	s.Lock.Lock()
 	for _, rec := range s.RecordMap {
@@ -130,13 +118,13 @@ func (s *Store) RemoveSession(tssn tunnel.Session) {
 	expvars.WebteleportRelaySessionsClosed.Add(1)
 }
 
-func (s *Store) GetSession(h string) (tunnel.Session, bool) {
+func (s *Store) GetRecord(h string) (*Record, bool) {
 	k := utils.StripPort(h)
 	k, _ = idna.ToASCII(k)
 	k = strings.Split(k, ".")[0]
 	rec, ok := s.LookupRecord(k)
 	if ok {
-		return rec.Session, true
+		return rec, true
 	}
 	return nil, false
 }
@@ -155,14 +143,14 @@ func (s *Store) Upsert(k string, r *edge.Edge) {
 	header := tags.Tags{Values: url.Values(r.Header)}
 	tags := tags.Tags{Values: r.Values}
 	rec := &Record{
-		Key:     k,
-		Session: r.Session,
-		Header:  header,
-		Tags:    tags,
-		Since:   since,
-		Visited: 0,
-		IP:      r.RealIP,
-		Path:    r.Path,
+		Key:          k,
+		Session:      r.Session,
+		RoundTripper: RoundTripper(r.Session),
+		Header:       header,
+		Tags:         tags,
+		Since:        since,
+		IP:           r.RealIP,
+		Path:         r.Path,
 	}
 
 	s.Lock.Lock()

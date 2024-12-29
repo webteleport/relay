@@ -15,9 +15,10 @@ func RoundTripper(tssn tunnel.Session) http.RoundTripper {
 		stm, err := tssn.Open(ctx)
 		return &VerboseConn{Conn: stm}, err
 	}
-	return &http.Transport{
+	tr := &http.Transport{
 		DialContext:     dialCtx,
 		MaxIdleConns:    100,
 		IdleConnTimeout: 90 * time.Second,
 	}
+	return NewMetricsTransport(tr)
 }

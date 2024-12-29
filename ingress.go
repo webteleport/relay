@@ -43,11 +43,11 @@ func (i *IngressHandler) Use(middlewares ...muxr.Middleware) {
 }
 
 func (i *IngressHandler) GetRoundTripper(h string) (http.RoundTripper, bool) {
-	tssn, ok := i.storage.GetSession(h)
+	rec, ok := i.storage.GetRecord(h)
 	if !ok {
 		return nil, false
 	}
-	return RoundTripper(tssn), true
+	return rec.RoundTripper, true
 }
 
 func (i *IngressHandler) RecordsHandler(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +127,6 @@ func (i *IngressHandler) Dispatch(r *http.Request) http.Handler {
 		req.Out.URL.Scheme = "http"
 	}
 	rp.ModifyResponse = func(resp *http.Response) error {
-		i.storage.Visited(r.Host)
 		expvars.WebteleportRelayStreamsClosed.Add(1)
 		return nil
 	}

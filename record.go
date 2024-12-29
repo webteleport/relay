@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"net/http"
 	"net/url"
 	"slices"
 	"time"
@@ -10,14 +11,14 @@ import (
 )
 
 type Record struct {
-	Key     string         `json:"key"`
-	Session tunnel.Session `json:"-"`
-	Header  tags.Tags      `json:"header"`
-	Tags    tags.Tags      `json:"tags"`
-	Since   time.Time      `json:"since"`
-	Visited int            `json:"visited"`
-	IP      string         `json:"ip"`
-	Path    string         `json:"path"`
+	Key          string            `json:"key"`
+	Session      tunnel.Session    `json:"-"`
+	RoundTripper http.RoundTripper `json:"metrics"`
+	Header       tags.Tags         `json:"header"`
+	Tags         tags.Tags         `json:"tags"`
+	Since        time.Time         `json:"since"`
+	IP           string            `json:"ip"`
+	Path         string            `json:"path"`
 }
 
 func (r *Record) Matches(kvs url.Values) (ok bool) {

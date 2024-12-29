@@ -53,8 +53,8 @@ type Storage interface {
 	// upsert session
 	Upsert(k string, r *edge.Edge)
 
-	// get session
-	GetSession(h string) (tunnel.Session, bool)
+	// get record
+	GetRecord(h string) (*Record, bool)
 
 	// get all records
 	Records() (all []*Record)
@@ -70,9 +70,6 @@ type Storage interface {
 
 	// log message
 	WebLog(msg string)
-
-	// mark visited
-	Visited(k string)
 
 	// alias
 	Alias(k string, v string)
