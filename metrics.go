@@ -27,19 +27,64 @@ type MetricsTransport struct {
 	Stats     TransportStats
 }
 
-type metricsReader struct {
-	rc    io.ReadCloser
+// metricReader wraps an io.Reader to count bytes read
+type metricReader struct {
+	r     io.Reader
 	count *int64
 }
 
-func (r *metricsReader) Read(p []byte) (n int, err error) {
-	n, err = r.rc.Read(p)
+func (r *metricReader) Read(p []byte) (n int, err error) {
+	n, err = r.r.Read(p)
 	*r.count += int64(n)
 	return
 }
 
-func (r *metricsReader) Close() error {
-	return r.rc.Close()
+// metricWriter wraps an io.Writer to count bytes written
+type metricWriter struct {
+	w     io.Writer
+	count *int64
+}
+
+func (w *metricWriter) Write(p []byte) (n int, err error) {
+	n, err = w.w.Write(p)
+	*w.count += int64(n)
+	return
+}
+
+// metricsReadCloser implements io.ReadCloser with metrics
+type metricsReadCloser struct {
+	metricReader
+	closer io.Closer
+}
+
+func (r *metricsReadCloser) Close() error {
+	return r.closer.Close()
+}
+
+// metricsReadWriteCloser implements io.ReadWriteCloser with metrics
+type metricsReadWriteCloser struct {
+	metricReader
+	metricWriter
+	closer io.Closer
+}
+
+func (rw *metricsReadWriteCloser) Close() error {
+	return rw.closer.Close()
+}
+
+// wrapBody wraps a body with metrics tracking, handling both ReadCloser and ReadWriteCloser cases
+func wrapBody(body io.ReadCloser, readCount, writeCount *int64) io.ReadCloser {
+	if rwc, ok := body.(io.ReadWriteCloser); ok {
+		return &metricsReadWriteCloser{
+			metricReader: metricReader{r: rwc, count: readCount},
+			metricWriter: metricWriter{w: rwc, count: writeCount},
+			closer:       rwc,
+		}
+	}
+	return &metricsReadCloser{
+		metricReader: metricReader{r: body, count: readCount},
+		closer:       body,
+	}
 }
 
 // NewMetricsTransport creates a new transport that collects HTTP metrics
@@ -64,10 +109,7 @@ func (t *MetricsTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 
 	// Wrap the request body if it exists
 	if req.Body != nil {
-		req.Body = &metricsReader{
-			rc:    req.Body,
-			count: &t.Stats.BytesSent,
-		}
+		req.Body = wrapBody(req.Body, &t.Stats.BytesReceived, &t.Stats.BytesSent)
 	}
 	t.Stats.RequestCount++
 
@@ -95,10 +137,7 @@ func (t *MetricsTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	t.Stats.ResponseCount++
 
 	// Wrap the response body
-	resp.Body = &metricsReader{
-		rc:    resp.Body,
-		count: &t.Stats.BytesReceived,
-	}
+	resp.Body = wrapBody(resp.Body, &t.Stats.BytesReceived, &t.Stats.BytesSent)
 
 	return resp, nil
 }
