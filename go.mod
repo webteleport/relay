@@ -10,10 +10,10 @@ require (
 	github.com/btwiuse/muxr v0.0.1
 	github.com/btwiuse/proxy v0.0.0
 	github.com/btwiuse/tags v0.0.2
-	github.com/quic-go/quic-go v0.49.0
+	github.com/quic-go/quic-go v0.50.0
 	github.com/quic-go/webtransport-go v0.8.1-0.20241018022711-4ac2c9250e66
 	github.com/webteleport/utils v0.2.19-alpha.1
-	github.com/webteleport/webteleport v0.5.40-alpha.1
+	github.com/webteleport/webteleport v0.5.40-alpha.2
 	golang.org/x/crypto v0.33.0
 	golang.org/x/exp v0.0.0-20250210185358-939b2ce775ac
 	golang.org/x/net v0.35.0
