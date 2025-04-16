@@ -1,15 +1,15 @@
 module github.com/webteleport/relay/cmd
 
-go 1.23.4
+go 1.24
 
 replace github.com/webteleport/relay => ..
 
 require (
 	github.com/btwiuse/multicall v0.0.5
-	github.com/quic-go/quic-go v0.48.2
-	github.com/webteleport/relay v0.4.43
-	github.com/webteleport/webteleport v0.5.38
-	golang.org/x/net v0.32.0
+	github.com/quic-go/quic-go v0.50.1
+	github.com/webteleport/relay v0.4.52-alpha.3
+	github.com/webteleport/webteleport v0.5.40-alpha.3
+	golang.org/x/net v0.39.0
 )
 
 require (
