@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/btwiuse/tags"
+	"github.com/phayes/freeport"
 	"github.com/webteleport/utils"
 	"github.com/webteleport/webteleport/edge"
 	"github.com/webteleport/webteleport/tunnel"
@@ -129,12 +130,26 @@ func (s *Store) GetRecord(h string) (*Record, bool) {
 	return nil, false
 }
 
-func (s *Store) Allocate(r *edge.Edge) (string, error) {
-	k := deriveOnionID(r.Path)
-	_, err := io.WriteString(r.Stream, fmt.Sprintf("HOST %s\n", k))
-	if err != nil {
-		return "", err
+func (s *Store) Allocate(r *edge.Edge) (key string, err error) {
+	switch edgeProtocol(r) {
+	case "tcp":
+		key, err = s.allocateTCP(r)
+	default:
+		key, err = s.allocateHTTP(r)
 	}
+	return
+}
+
+func (s *Store) allocateTCP(r *edge.Edge) (string, error) {
+	port, err := freeport.GetFreePort()
+	if err != nil {
+		return "", fmt.Errorf("failed to allocate tcp port: %w", err)
+	}
+	return fmt.Sprintf(":%d", port), nil
+}
+
+func (s *Store) allocateHTTP(r *edge.Edge) (string, error) {
+	k := deriveOnionID(r.Path)
 	return k, nil
 }
 
@@ -143,14 +158,17 @@ func (s *Store) Upsert(k string, r *edge.Edge) {
 	header := tags.Tags{Values: url.Values(r.Header)}
 	tags := tags.Tags{Values: r.Values}
 	rec := &Record{
-		Key:          k,
-		Session:      r.Session,
-		RoundTripper: RoundTripper(r.Session),
-		Header:       header,
-		Tags:         tags,
-		Since:        since,
-		IP:           r.RealIP,
-		Path:         r.Path,
+		Key:     k,
+		Session: r.Session,
+		Header:  header,
+		Tags:    tags,
+		Since:   since,
+		IP:      r.RealIP,
+		Path:    r.Path,
+	}
+
+	if edgeProtocol(r) == "http" {
+		rec.RoundTripper = RoundTripper(r.Session)
 	}
 
 	s.Lock.Lock()
@@ -222,10 +240,21 @@ func (s *Store) Subscribe(upgrader edge.Upgrader) {
 
 		key, err := s.Allocate(r)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("allocate hostname failed: %s", err))
+			slog.Warn(fmt.Sprintf("allocate resource failed: %s", err))
+			_, _ = io.WriteString(r.Stream, fmt.Sprintf("ERR %s\n", err))
 			continue
 		}
 
+		_, _ = io.WriteString(r.Stream, fmt.Sprintf("HOST %s\n", key))
+
 		s.Upsert(key, r)
 	}
+}
+
+func edgeProtocol(r *edge.Edge) string {
+	protocol := r.Values.Get("protocol")
+	if protocol != "" {
+		return protocol
+	}
+	return "http"
 }

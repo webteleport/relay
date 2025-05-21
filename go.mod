@@ -10,6 +10,7 @@ require (
 	github.com/btwiuse/muxr v0.0.1
 	github.com/btwiuse/proxy v0.0.0
 	github.com/btwiuse/tags v0.0.2
+	github.com/phayes/freeport v0.0.0-20220201140144-74d24b5ae9f5
 	github.com/quic-go/quic-go v0.50.1
 	github.com/quic-go/webtransport-go v0.8.1-0.20250328130601-2671ef85124d
 	github.com/webteleport/utils v0.2.19-alpha.4
