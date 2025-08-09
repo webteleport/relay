@@ -33,21 +33,22 @@ type WSServer struct {
 	edge.HTTPUpgrader
 }
 
-func (s *WSServer) Dispatch(r *http.Request) http.Handler {
+func (s *WSServer) Dispatch(r *http.Request) (h http.Handler) {
 	switch {
 	case s.IsUpgrade(r):
-		return s.HTTPUpgrader
+		h = s.HTTPUpgrader
 	case s.IsRootInternal(r):
-		return http.HandlerFunc(s.RootInternalHandler)
+		h = http.HandlerFunc(s.RootInternalHandler)
 	case IsInternal(r):
-		return http.HandlerFunc(handleInternal)
+		h = http.HandlerFunc(handleInternal)
 	case s.IsRootExternal(r):
-		return http.HandlerFunc(s.RootHandler)
+		h = http.HandlerFunc(s.RootHandler)
 	case proxy.IsProxy(r):
-		return proxy.AuthenticatedProxyHandler
+		h = proxy.AuthenticatedProxyHandler
 	default:
-		return s.Ingress
+		h = s.Ingress
 	}
+	return
 }
 
 func (s *WSServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {

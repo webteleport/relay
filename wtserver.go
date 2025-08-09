@@ -53,15 +53,16 @@ type WTServer struct {
 	*webtransport.Upgrader
 }
 
-func (s *WTServer) Dispatch(r *http.Request) http.Handler {
+func (s *WTServer) Dispatch(r *http.Request) (h http.Handler) {
 	switch {
 	case s.IsUpgrade(r):
-		return s.Upgrader
+		h = s.Upgrader
 	case proxy.IsProxy(r):
-		return proxy.AuthenticatedProxyHandler
+		h = proxy.AuthenticatedProxyHandler
 	default:
-		return s.Ingress
+		h = s.Ingress
 	}
+	return
 }
 
 func (s *WTServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
