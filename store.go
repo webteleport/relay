@@ -27,6 +27,7 @@ var _ Storage = (*Store)(nil)
 var DefaultStorage = NewStore()
 
 type Store struct {
+	OnUpdateFunc func(* Store)
 	Lock         *sync.RWMutex
 	PingInterval time.Duration
 	Verbose      bool
@@ -48,6 +49,13 @@ func NewStore() *Store {
 	}
 }
 
+func (s *Store) OnUpdate() {
+	if s.OnUpdateFunc != nil {
+		return
+	}
+	s.OnUpdateFunc(s)
+}
+
 func (s *Store) Records() (all []*Record) {
 	s.Lock.RLock()
 	all = maps.Values(s.RecordMap)
@@ -59,12 +67,14 @@ func (s *Store) Records() (all []*Record) {
 }
 
 func (s *Store) Alias(k string, v string) {
+	defer s.OnUpdate()
 	s.Lock.Lock()
 	s.AliasMap[k] = v
 	s.Lock.Unlock()
 }
 
 func (s *Store) Unalias(k string) {
+	defer s.OnUpdate()
 	s.Lock.Lock()
 	delete(s.AliasMap, k)
 	s.Lock.Unlock()
@@ -104,6 +114,7 @@ func (s *Store) WebLog(msg string) {
 }
 
 func (s *Store) RemoveSession(tssn tunnel.Session) {
+	defer s.OnUpdate()
 	s.Lock.Lock()
 	for _, rec := range s.RecordMap {
 		if rec.Session == tssn {
@@ -171,6 +182,7 @@ func (s *Store) Upsert(k string, r *edge.Edge) {
 		rec.RoundTripper = RoundTripper(r.Session)
 	}
 
+	defer s.OnUpdate()
 	s.Lock.Lock()
 	_, has := s.RecordMap[k]
 	s.RecordMap[k] = rec
