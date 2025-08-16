@@ -28,21 +28,39 @@ var DefaultStorage = NewStore()
 
 type Store struct {
 	OnUpdateFunc func(*Store)
+	Logger       *slog.Logger
 	Lock         *sync.RWMutex
 	PingInterval time.Duration
-	Verbose      bool
-	Webhook      string
 	Client       *http.Client
 	RecordMap    map[string]*Record
 	AliasMap     map[string]string
 }
 
+func getLogLevel() slog.Level {
+	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo // default if env var not set or unrecognized
+	}
+}
+
+var DefaultLogger *slog.Logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+	Level:     getLogLevel(),
+	AddSource: true,
+}))
+
 func NewStore() *Store {
 	return &Store{
+		Logger:       DefaultLogger,
 		Lock:         &sync.RWMutex{},
 		PingInterval: time.Second * 5,
-		Verbose:      os.Getenv("VERBOSE") != "",
-		Webhook:      os.Getenv("WEBHOOK"),
 		Client:       &http.Client{},
 		RecordMap:    map[string]*Record{},
 		AliasMap:     map[string]string{},
@@ -106,27 +124,12 @@ func (s *Store) LookupRecord(k string) (rec *Record, ok bool) {
 	return
 }
 
-func (s *Store) WebLog(msg string) {
-	if s.Webhook == "" {
-		return
-	}
-	remote := fmt.Sprintf("%s/%s", s.Webhook, msg)
-	req, err := http.NewRequest("LOG", remote, nil)
-	if err != nil {
-		return
-	}
-	go s.Client.Do(req)
-}
-
 func (s *Store) RemoveSession(tssn tunnel.Session) {
 	s.Mut(func(store *Store) {
 		for _, rec := range store.RecordMap {
 			if rec.Session == tssn {
 				delete(store.RecordMap, rec.Key)
-				if s.Verbose {
-					slog.Info("remove", "key", rec.Key)
-				}
-				store.WebLog(fmt.Sprintf("remove/%s?ip=%s", rec.Key, rec.IP))
+				s.Logger.Debug("remove", "key", rec.Key)
 				break
 			}
 		}
@@ -188,20 +191,17 @@ func (s *Store) Upsert(k string, r *edge.Edge) {
 
 	var has bool
 	s.Mut(func(store *Store) {
-		_, has := store.RecordMap[k]
+		_, has = store.RecordMap[k]
 		store.RecordMap[k] = rec
 	})
 
-	action := ""
+	var action string
 	if has {
 		action = "update"
 	} else {
 		action = "insert"
 	}
-	if s.Verbose {
-		slog.Info(action, "key", rec.Key, "ip", rec.IP)
-	}
-	s.WebLog(fmt.Sprintf("%s/%s?ip=%s", action, rec.Key, rec.IP))
+	s.Logger.Debug(action, "key", rec.Key, "ip", rec.IP)
 
 	if os.Getenv("PING") != "" {
 		go s.Ping(r)
@@ -232,7 +232,7 @@ func (s *Store) Scan(r *edge.Edge) {
 		if line == "CLOSE" {
 			break
 		}
-		slog.Warn(fmt.Sprintf("stm0: unknown command: %s", line))
+		s.Logger.Warn(fmt.Sprintf("stm0: unknown command: %s", line))
 	}
 	s.RemoveSession(r.Session)
 }
@@ -241,22 +241,20 @@ func (s *Store) Subscribe(upgrader edge.Upgrader) {
 	for {
 		r, err := upgrader.Upgrade()
 		if err == io.EOF {
-			slog.Warn("upgrade EOF")
+			s.Logger.Warn("upgrade EOF")
 			break
 		}
 
 		if err != nil {
-			slog.Warn(fmt.Sprintf("upgrade session failed: %s", err))
+			s.Logger.Warn(fmt.Sprintf("upgrade session failed: %s", err))
 			continue
 		}
 
-		if s.Verbose {
-			slog.Info("subscribe", "request", r)
-		}
+		s.Logger.Debug("subscribe", "request", r)
 
 		key, err := s.Allocate(r)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("allocate resource failed: %s", err))
+			s.Logger.Warn(fmt.Sprintf("allocate resource failed: %s", err))
 			_, _ = io.WriteString(r.Stream, fmt.Sprintf("ERR %s\n", err))
 			continue
 		}

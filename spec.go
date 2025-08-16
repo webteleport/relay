@@ -68,9 +68,6 @@ type Storage interface {
 	// subscribe to incoming stream of edge.Edge
 	edge.Subscriber
 
-	// log message
-	WebLog(msg string)
-
 	// alias
 	Alias(k string, v string)
 
