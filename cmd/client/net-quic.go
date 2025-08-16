@@ -10,7 +10,7 @@ import (
 )
 
 func RunNetQuic(args []string) error {
-	ln, err := quic.Listen(context.Background(), arg0(args, "127.0.0.1:8083/test-go-quic?asdf=1"))
+	ln, err := quic.Listen(context.Background(), arg0(args, "127.0.0.1:8083/test-net-quic?asdf=1"))
 	if err != nil {
 		return err
 	}
