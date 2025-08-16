@@ -67,22 +67,20 @@ func (s *Store) Records() (all []*Record) {
 }
 
 func (s *Store) Alias(k string, v string) {
-	defer s.OnUpdate()
-	s.Lock.Lock()
-	s.AliasMap[k] = v
-	s.Lock.Unlock()
+	s.Mut(func(store *Store) {
+		store.AliasMap[k] = v
+	})
 }
 
 func (s *Store) Unalias(k string) {
-	defer s.OnUpdate()
-	s.Lock.Lock()
-	delete(s.AliasMap, k)
-	s.Lock.Unlock()
+	s.Mut(func(store *Store) {
+		delete(store.AliasMap, k)
+	})
 }
 
 func (s *Store) Aliases() (all map[string]string) {
 	s.Lock.RLock()
-	all = s.AliasMap
+	all = maps.Clone(s.AliasMap)
 	s.Lock.RUnlock()
 	return
 }
