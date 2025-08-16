@@ -27,7 +27,7 @@ var _ Storage = (*Store)(nil)
 var DefaultStorage = NewStore()
 
 type Store struct {
-	OnUpdateFunc func(* Store)
+	OnUpdateFunc func(*Store)
 	Lock         *sync.RWMutex
 	PingInterval time.Duration
 	Verbose      bool
@@ -47,6 +47,13 @@ func NewStore() *Store {
 		RecordMap:    map[string]*Record{},
 		AliasMap:     map[string]string{},
 	}
+}
+
+func (s *Store) Mut(m func(*Store)) {
+	s.Lock.Lock()
+	m(s)
+	s.Lock.Unlock()
+	s.OnUpdate()
 }
 
 func (s *Store) OnUpdate() {
@@ -112,19 +119,18 @@ func (s *Store) WebLog(msg string) {
 }
 
 func (s *Store) RemoveSession(tssn tunnel.Session) {
-	defer s.OnUpdate()
-	s.Lock.Lock()
-	for _, rec := range s.RecordMap {
-		if rec.Session == tssn {
-			delete(s.RecordMap, rec.Key)
-			if s.Verbose {
-				slog.Info("remove", "key", rec.Key)
+	s.Mut(func(store *Store) {
+		for _, rec := range store.RecordMap {
+			if rec.Session == tssn {
+				delete(store.RecordMap, rec.Key)
+				if s.Verbose {
+					slog.Info("remove", "key", rec.Key)
+				}
+				store.WebLog(fmt.Sprintf("remove/%s?ip=%s", rec.Key, rec.IP))
+				break
 			}
-			s.WebLog(fmt.Sprintf("remove/%s?ip=%s", rec.Key, rec.IP))
-			break
 		}
-	}
-	s.Lock.Unlock()
+	})
 	expvars.WebteleportRelaySessionsClosed.Add(1)
 }
 
@@ -180,11 +186,11 @@ func (s *Store) Upsert(k string, r *edge.Edge) {
 		rec.RoundTripper = RoundTripper(r.Session)
 	}
 
-	defer s.OnUpdate()
-	s.Lock.Lock()
-	_, has := s.RecordMap[k]
-	s.RecordMap[k] = rec
-	s.Lock.Unlock()
+	var has bool
+	s.Mut(func(store *Store) {
+		_, has := store.RecordMap[k]
+		store.RecordMap[k] = rec
+	})
 
 	action := ""
 	if has {
