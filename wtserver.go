@@ -29,7 +29,7 @@ func NewWTServer(host string, ingress Ingress) *WTServer {
 		Ingress:  ingress,
 		Upgrader: hu,
 	}
-	hu.Server.H3 = http3.Server{
+	hu.Server.H3 = &http3.Server{
 		Handler: s,
 		// WebTransport requires DATAGRAM support
 		EnableDatagrams: true,
