@@ -146,10 +146,11 @@ func (t *MetricsTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	return resp, nil
 }
 
-// MarshalJSON implements the json.Marshaler interface
-func (t *MetricsTransport) MarshalJSON() ([]byte, error) {
+// snapshot returns a consistent copy of the current stats.
+func (t *MetricsTransport) snapshot() TransportStats {
 	t.mu.Lock()
-	snapshot := TransportStats{
+	defer t.mu.Unlock()
+	return TransportStats{
 		BytesSent:            atomic.LoadInt64(&t.Stats.BytesSent),
 		BytesReceived:        atomic.LoadInt64(&t.Stats.BytesReceived),
 		RequestCount:         atomic.LoadInt64(&t.Stats.RequestCount),
@@ -161,25 +162,16 @@ func (t *MetricsTransport) MarshalJSON() ([]byte, error) {
 		MaxRequestDuration:   t.Stats.MaxRequestDuration,
 		MinRequestDuration:   t.Stats.MinRequestDuration,
 	}
-	t.mu.Unlock()
-	return json.Marshal(snapshot)
+}
+
+// MarshalJSON implements the json.Marshaler interface
+func (t *MetricsTransport) MarshalJSON() ([]byte, error) {
+	s := t.snapshot()
+	return json.Marshal(s)
 }
 
 // MarshalJSONIndent returns an indented JSON representation
 func (t *MetricsTransport) MarshalJSONIndent(prefix, indent string) ([]byte, error) {
-	t.mu.Lock()
-	snapshot := TransportStats{
-		BytesSent:            atomic.LoadInt64(&t.Stats.BytesSent),
-		BytesReceived:        atomic.LoadInt64(&t.Stats.BytesReceived),
-		RequestCount:         atomic.LoadInt64(&t.Stats.RequestCount),
-		ResponseCount:        atomic.LoadInt64(&t.Stats.ResponseCount),
-		FailedRequests:       atomic.LoadInt64(&t.Stats.FailedRequests),
-		ActiveRequests:       atomic.LoadInt64(&t.Stats.ActiveRequests),
-		TotalRequestDuration: t.Stats.TotalRequestDuration,
-		LastRequestTime:      t.Stats.LastRequestTime,
-		MaxRequestDuration:   t.Stats.MaxRequestDuration,
-		MinRequestDuration:   t.Stats.MinRequestDuration,
-	}
-	t.mu.Unlock()
-	return json.MarshalIndent(snapshot, prefix, indent)
+	s := t.snapshot()
+	return json.MarshalIndent(s, prefix, indent)
 }
