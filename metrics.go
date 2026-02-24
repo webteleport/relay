@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -25,6 +27,7 @@ type TransportStats struct {
 type MetricsTransport struct {
 	Transport http.RoundTripper
 	Stats     *TransportStats
+	mu        sync.Mutex // protects duration/time fields in Stats
 }
 
 // metricReader wraps an io.Reader to count bytes read
@@ -35,7 +38,7 @@ type metricReader struct {
 
 func (r *metricReader) Read(p []byte) (n int, err error) {
 	n, err = r.r.Read(p)
-	*r.count += int64(n)
+	atomic.AddInt64(r.count, int64(n))
 	return
 }
 
@@ -47,7 +50,7 @@ type metricWriter struct {
 
 func (w *metricWriter) Write(p []byte) (n int, err error) {
 	n, err = w.w.Write(p)
-	*w.count += int64(n)
+	atomic.AddInt64(w.count, int64(n))
 	return
 }
 
@@ -100,8 +103,8 @@ func NewMetricsTransport(wrapped http.RoundTripper) *MetricsTransport {
 
 // RoundTrip implements the http.RoundTripper interface
 func (t *MetricsTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	t.Stats.ActiveRequests++
-	defer func() { t.Stats.ActiveRequests-- }()
+	atomic.AddInt64(&t.Stats.ActiveRequests, 1)
+	defer atomic.AddInt64(&t.Stats.ActiveRequests, -1)
 
 	startTime := time.Now()
 
@@ -109,13 +112,15 @@ func (t *MetricsTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	if req.Body != nil {
 		req.Body = wrapBody(req.Body, &t.Stats.BytesReceived, &t.Stats.BytesSent)
 	}
-	t.Stats.RequestCount++
+	atomic.AddInt64(&t.Stats.RequestCount, 1)
 
 	// Perform the request
 	resp, err := t.Transport.RoundTrip(req)
 
 	// Calculate request duration
 	duration := time.Since(startTime)
+
+	t.mu.Lock()
 	t.Stats.TotalRequestDuration += duration
 	t.Stats.LastRequestTime = time.Now()
 
@@ -126,13 +131,14 @@ func (t *MetricsTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	if t.Stats.MinRequestDuration == 0 || duration < t.Stats.MinRequestDuration {
 		t.Stats.MinRequestDuration = duration
 	}
+	t.mu.Unlock()
 
 	if err != nil {
-		t.Stats.FailedRequests++
+		atomic.AddInt64(&t.Stats.FailedRequests, 1)
 		return nil, err
 	}
 
-	t.Stats.ResponseCount++
+	atomic.AddInt64(&t.Stats.ResponseCount, 1)
 
 	// Wrap the response body
 	resp.Body = wrapBody(resp.Body, &t.Stats.BytesReceived, &t.Stats.BytesSent)
@@ -142,10 +148,38 @@ func (t *MetricsTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 
 // MarshalJSON implements the json.Marshaler interface
 func (t *MetricsTransport) MarshalJSON() ([]byte, error) {
-	return json.Marshal(t.Stats)
+	t.mu.Lock()
+	snapshot := TransportStats{
+		BytesSent:            atomic.LoadInt64(&t.Stats.BytesSent),
+		BytesReceived:        atomic.LoadInt64(&t.Stats.BytesReceived),
+		RequestCount:         atomic.LoadInt64(&t.Stats.RequestCount),
+		ResponseCount:        atomic.LoadInt64(&t.Stats.ResponseCount),
+		FailedRequests:       atomic.LoadInt64(&t.Stats.FailedRequests),
+		ActiveRequests:       atomic.LoadInt64(&t.Stats.ActiveRequests),
+		TotalRequestDuration: t.Stats.TotalRequestDuration,
+		LastRequestTime:      t.Stats.LastRequestTime,
+		MaxRequestDuration:   t.Stats.MaxRequestDuration,
+		MinRequestDuration:   t.Stats.MinRequestDuration,
+	}
+	t.mu.Unlock()
+	return json.Marshal(snapshot)
 }
 
 // MarshalJSONIndent returns an indented JSON representation
 func (t *MetricsTransport) MarshalJSONIndent(prefix, indent string) ([]byte, error) {
-	return json.MarshalIndent(t.Stats, prefix, indent)
+	t.mu.Lock()
+	snapshot := TransportStats{
+		BytesSent:            atomic.LoadInt64(&t.Stats.BytesSent),
+		BytesReceived:        atomic.LoadInt64(&t.Stats.BytesReceived),
+		RequestCount:         atomic.LoadInt64(&t.Stats.RequestCount),
+		ResponseCount:        atomic.LoadInt64(&t.Stats.ResponseCount),
+		FailedRequests:       atomic.LoadInt64(&t.Stats.FailedRequests),
+		ActiveRequests:       atomic.LoadInt64(&t.Stats.ActiveRequests),
+		TotalRequestDuration: t.Stats.TotalRequestDuration,
+		LastRequestTime:      t.Stats.LastRequestTime,
+		MaxRequestDuration:   t.Stats.MaxRequestDuration,
+		MinRequestDuration:   t.Stats.MinRequestDuration,
+	}
+	t.mu.Unlock()
+	return json.MarshalIndent(snapshot, prefix, indent)
 }
