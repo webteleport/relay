@@ -44,7 +44,7 @@ func (s *WTServer) WithAddr(a string) *WTServer {
 }
 
 func (s *WTServer) WithTLSConfig(tlsConfig *tls.Config) *WTServer {
-	s.Upgrader.Server.H3.TLSConfig = tlsConfig
+	s.Upgrader.Server.H3.TLSConfig = http3.ConfigureTLSConfig(tlsConfig)
 	return s
 }
 
