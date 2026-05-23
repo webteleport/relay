@@ -8,7 +8,7 @@ require (
 	github.com/btwiuse/multicall v0.0.5
 	github.com/quic-go/quic-go v0.59.0
 	github.com/webteleport/relay v0.0.0-00010101000000-000000000000
-	github.com/webteleport/webteleport v0.5.40-alpha.12
+	github.com/webteleport/webteleport v0.5.40-alpha.13
 	golang.org/x/net v0.49.0
 )
 
