@@ -31,9 +31,8 @@ func NewWTServer(host string, ingress Ingress) *WTServer {
 	}
 	hu.Server.H3 = &http3.Server{
 		Handler: s,
-		// WebTransport requires DATAGRAM support
-		EnableDatagrams: true,
 	}
+	wt.ConfigureHTTP3Server(hu.Server.H3)
 	go ingress.Subscribe(hu)
 	return s
 }
