@@ -56,6 +56,10 @@ func (s *WSServer) RootInternalHandler(w http.ResponseWriter, r *http.Request) {
 
 // rewrite requests targeting example.com/sub/* to sub.example.com/*
 func (s *WSServer) RootHandler(w http.ResponseWriter, r *http.Request) {
+	if altsvc := os.Getenv("ALT_SVC"); altsvc != "" {
+		w.Header().Set("Alt-Svc", altsvc)
+	}
+
 	rpath := leadingComponent(r.URL.Path)
 	rt, ok := s.GetRoundTripper(rpath)
 	if !ok {
