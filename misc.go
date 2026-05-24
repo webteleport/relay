@@ -60,6 +60,12 @@ func (s *WSServer) RootHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Alt-Svc", altsvc)
 	}
 
+	if r.Method == http.MethodHead {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	rpath := leadingComponent(r.URL.Path)
 	rt, ok := s.GetRoundTripper(rpath)
 	if !ok {
