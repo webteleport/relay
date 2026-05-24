@@ -14,7 +14,7 @@ require (
 	github.com/quic-go/quic-go v0.59.0
 	github.com/quic-go/webtransport-go v0.10.0
 	github.com/webteleport/utils v0.2.19-alpha.10
-	github.com/webteleport/webteleport v0.5.40-alpha.14
+	github.com/webteleport/webteleport v0.5.40-alpha.16
 	golang.org/x/crypto v0.47.0
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
 	golang.org/x/net v0.49.0
@@ -35,6 +35,7 @@ require (
 	github.com/miekg/dns v1.1.70 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/rs/cors v1.11.1 // indirect
+	github.com/webtransport/webtransport v0.0.1 // indirect
 	golang.org/x/mod v0.32.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
