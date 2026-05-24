@@ -56,6 +56,12 @@ func (s *WSServer) RootInternalHandler(w http.ResponseWriter, r *http.Request) {
 
 // rewrite requests targeting example.com/sub/* to sub.example.com/*
 func (s *WSServer) RootHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodHead {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	if altsvc := os.Getenv("ALT_SVC"); altsvc != "" {
 		w.Header().Set("Alt-Svc", altsvc)
 	}
