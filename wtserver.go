@@ -36,6 +36,7 @@ func NewWTServer(host string, ingress Ingress) *WTServer {
 		QUICConfig: &quic.Config{
 			MaxIdleTimeout:  30 * time.Second,
 			KeepAlivePeriod: 15 * time.Second,
+			Allow0RTT:       true,
 		},
 	}
 	wt.ConfigureHTTP3Server(hu.Server.H3)
