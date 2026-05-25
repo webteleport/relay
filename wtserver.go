@@ -3,9 +3,11 @@ package relay
 import (
 	"crypto/tls"
 	"net/http"
+	"time"
 
 	"github.com/btwiuse/dispatcher"
 	"github.com/btwiuse/proxy"
+	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	wt "github.com/quic-go/webtransport-go"
 	"github.com/webteleport/utils"
@@ -31,6 +33,10 @@ func NewWTServer(host string, ingress Ingress) *WTServer {
 	}
 	hu.Server.H3 = &http3.Server{
 		Handler: s,
+		QUICConfig: &quic.Config{
+			MaxIdleTimeout:  30 * time.Second,
+			KeepAlivePeriod: 15 * time.Second,
+		},
 	}
 	wt.ConfigureHTTP3Server(hu.Server.H3)
 	go ingress.Subscribe(hu)
