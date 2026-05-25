@@ -2,6 +2,7 @@ package main
 
 import (
 	"net"
+	"time"
 
 	"github.com/quic-go/quic-go"
 	qg "github.com/webteleport/webteleport/transport/quic-go"
@@ -11,8 +12,11 @@ import (
 var MaxIncomingStreams int64 = 1 << 60
 
 var QuicGoConfig = &quic.Config{
-	EnableDatagrams:    true,
-	MaxIncomingStreams: MaxIncomingStreams,
+	EnableDatagrams:                  true,
+	EnableStreamResetPartialDelivery: true,
+	MaxIncomingStreams:               MaxIncomingStreams,
+	MaxIdleTimeout:                   30 * time.Second,
+	KeepAlivePeriod:                  15 * time.Second,
 }
 
 func newQuicGoUpgrader(host string, port string) (*qg.Upgrader, error) {

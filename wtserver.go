@@ -32,11 +32,13 @@ func NewWTServer(host string, ingress Ingress) *WTServer {
 		Upgrader: hu,
 	}
 	hu.Server.H3 = &http3.Server{
-		Handler: s,
+		Handler:         s,
+		EnableDatagrams: true,
 		QUICConfig: &quic.Config{
-			MaxIdleTimeout:  30 * time.Second,
-			KeepAlivePeriod: 15 * time.Second,
-			Allow0RTT:       true,
+			EnableStreamResetPartialDelivery: true,
+			MaxIdleTimeout:                   30 * time.Second,
+			KeepAlivePeriod:                  15 * time.Second,
+			Allow0RTT:                        true,
 		},
 	}
 	wt.ConfigureHTTP3Server(hu.Server.H3)
