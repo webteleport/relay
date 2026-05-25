@@ -19,7 +19,6 @@ import (
 	"github.com/webteleport/webteleport/edge"
 	"github.com/webteleport/webteleport/tunnel"
 	"golang.org/x/exp/maps"
-	"golang.org/x/net/idna"
 )
 
 var _ Storage = (*Store)(nil)
@@ -139,7 +138,7 @@ func (s *Store) RemoveSession(tssn tunnel.Session) {
 
 func (s *Store) GetRecord(h string) (*Record, bool) {
 	k := utils.StripPort(h)
-	k, _ = idna.ToASCII(k)
+	k = ToIdna(k)
 	k = strings.Split(k, ".")[0]
 	rec, ok := s.LookupRecord(k)
 	if ok {

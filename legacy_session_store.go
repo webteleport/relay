@@ -26,7 +26,6 @@ import (
 	"github.com/webteleport/webteleport/edge"
 	"github.com/webteleport/webteleport/tunnel"
 	"golang.org/x/exp/maps"
-	"golang.org/x/net/idna"
 )
 
 // Deprecated: NewSessionStore is aliased to NewIngress, use NewIngress instead
@@ -87,7 +86,7 @@ func (s *SessionStore) RecordsHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *SessionStore) Visited(k string) {
 	k = utils.StripPort(k)
-	k, _ = idna.ToASCII(k)
+	k = ToIdna(k)
 	k = strings.Split(k, ".")[0]
 	s.Lock.Lock()
 	rec, ok := s.Record[k]
@@ -115,7 +114,7 @@ func (s *SessionStore) RemoveSession(tssn tunnel.Session) {
 
 func (s *SessionStore) GetSession(h string) (tunnel.Session, bool) {
 	k := utils.StripPort(h)
-	k, _ = idna.ToASCII(k)
+	k = ToIdna(k)
 	k = strings.Split(k, ".")[0]
 	s.Lock.RLock()
 	rec, ok := s.Record[k]
